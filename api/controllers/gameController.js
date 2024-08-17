@@ -8,14 +8,14 @@ const  { getRandomInt, getRandomItem } = require('../utils/randomUtil');
 
 // 挖礦
 exports.mine = async (req, res) => {
-  const { userId } = req.body;
+  const { discordId } = req.params;
 
-  if (!userId) {
+  if (!discordId) {
     return res.status(400).json({ error: '需要用戶ID' });
   }
 
   try {
-    const user = await User.findById(userId);
+    const user = await User.findOne({ discordId });
     if (!user) {
       return res.status(404).json({ error: '找不到使用者' });
     }
@@ -29,22 +29,22 @@ exports.mine = async (req, res) => {
       // 預設工具
       defaultTool = await Tool.findOne({ price: 0 });
       user.tools.push(defaultTool.id);
-
       // 裝備預設工具、礦場
       user.equipped = {
         mine: defaultMine.id,
         tool: defaultTool.id,
       }
+      await user.save();
     }
 
-    const mine = defaultMine || await Mine.findById(user.equipped.mine).populate({
+    const mine = await Mine.findById(user.equipped.mine).populate({
       path: 'minerals.mineral',
       model: 'Mineral',
     });
-    const tool = defaultTool || await Tool.findById(user.equipped.tool);
+    const tool = await Tool.findById(user.equipped.tool);
 
     // 檢查等級需求
-    const userLevel = await getUserLevelAndExperience(userId);
+    const userLevel = await getUserLevelAndExperience(discordId);
     if (userLevel.level < mine.levelRequirement) {
       return res.status(400).json({ error: `等級需求：${mine.levelRequirement}，你的等級：${userLevel.level}` });
     }
@@ -67,7 +67,7 @@ exports.mine = async (req, res) => {
         existingMineral.totalValue += mineral.mineral.value * num;
         continue;
       }
-      minerals.push({ 
+      minerals.push({
         name: mineral.mineral.name,
         perValue: mineral.mineral.value,
         totalValue: mineral.mineral.value * num,
@@ -78,6 +78,12 @@ exports.mine = async (req, res) => {
       });
     }
 
+    const userObj = user;
+
+    // 紀錄獲得前的經驗、等級
+    userObj.prevExp = user.experience;
+    userObj.prevLevel = userLevel.level;
+
     // 獲得經驗
     user.experience += exp;
 
@@ -87,7 +93,9 @@ exports.mine = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ minerals, totalValue, user, totalExp: exp });
+    userObj.level = (await getUserLevelAndExperience(discordId)).level;
+
+    res.status(200).json({ minerals, totalValue, user: userObj, totalExp: exp });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法挖礦' });
@@ -96,16 +104,16 @@ exports.mine = async (req, res) => {
 
 // 礦場列表
 exports.listMines = async (req, res) => {
-  const { userId } = req.query;
+  const { discordId } = req.params;
 
-  if (!userId) {
+  if (!discordId) {
     return res.status(400).json({ error: '需要用戶ID' });
   }
 
   try {
     const mines = await Mine.find();
     // 玩家已擁有的礦場
-    const user = await User.findById(userId).populate('mines');
+    const user = await User.findOne({ discordId }).populate('mines');
     const userMines = user.mines.map(m => m.id);
     const minesWithUser = mines.map(mine => {
       return {
@@ -122,16 +130,16 @@ exports.listMines = async (req, res) => {
 
 // 工具列表
 exports.listTools = async (req, res) => {
-  const { userId } = req.query;
+  const { discordId } = req.params;
 
-  if (!userId) {
+  if (!discordId) {
     return res.status(400).json({ error: '需要用戶ID' });
   }
 
   try {
     const tools = await Tool.find();
     // 玩家已擁有的工具
-    const user = await User.findById(userId).populate('tools');
+    const user = await User.findOne({ discordId }).populate('tools');
     const userTools = user.tools.map(tool => tool.id);
     const toolsWithUser = tools.map(tool => {
       return {
@@ -145,3 +153,65 @@ exports.listTools = async (req, res) => {
     res.status(500).json({ error: '無法取得工具列表' });
   }
 }
+
+// 特定工具
+exports.listTool = async (req, res) => {
+  const { toolId } = req.params;
+
+  if (!toolId) {
+    return res.status(400).json({ error: '需要工具ID' });
+  }
+
+  try {
+    const tool = await Tool.findById(toolId);
+    res.status(200).json(tool);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得工具' });
+  }
+}
+
+// 抽獎池列表
+exports.listRafflePools = async (req, res) => {
+  try {
+    const rafflePools = await RafflePool.find();
+    res.status(200).json(rafflePools);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得抽獎池列表' });
+  }
+}
+
+// 購買礦場
+exports.buyMine = async (req, res) => {
+  const { discordId, mineId } = req.body;
+
+  if (!discordId || !mineId) {
+    return res.status(400).json({ error: '需要用戶ID和礦場ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const mine = await Mine.findById(mineId);
+    if (!mine) {
+      return res.status(404).json({ error: '找不到礦場' });
+    }
+
+    if (user.currency < mine.price) {
+      return res.status(400).json({ error: '貨幣不足' });
+    }
+
+    user.currency -= mine.price;
+    user.mines.push(mine.id);
+    await user.save();
+
+    res.status(200).json({ message: '購買成功', user });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法購買礦場' });
+  }
+};

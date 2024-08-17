@@ -1,4 +1,14 @@
-const User = require('../models/User');
+const { User } = require('../models/User');
+
+const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
+
+const levelColorMap = {
+  0: 0x686D76,
+  25: 0x3795BD,
+  50: 0x7C00FE,
+  75: 0xF9E400,
+  100: 0xF5004F,
+};
 
 // 創建用戶
 exports.createUser = async (req, res) => {
@@ -11,8 +21,17 @@ exports.createUser = async (req, res) => {
   try {
     const newUser = new User({ name, discordId });
     await newUser.save();
-    res.status(201).json({ message: '使用者創建成功', user: newUser });
+
+    const levelData = await getUserLevelAndExperience(discordId);
+    const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
+
+    res.status(201).json({ message: '使用者創建成功', user: {
+      ...newUser._doc,
+      level: levelData.level,
+      color,
+    } });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ error: '使用者創建失敗' });
   }
 };
@@ -29,15 +48,44 @@ exports.getUsers = async (req, res) => {
 
 // 獲取用戶
 exports.getUser = async (req, res) => {
-  const { id } = req.params;
+  const { discordId } = req.params;
 
   try {
-    const user = await User.findById(id);
+
+    const user = await User.findOne({ discordId }).populate({
+      path: 'equipped.tool',
+      model: 'Tool',
+    }).populate({
+      path: 'equipped.mine',
+      model: 'Mine',
+    });
     if (!user) {
       return res.status(404).json({ error: '找不到使用者' });
     }
-    res.status(200).json(user);
+
+    const levelData = await getUserLevelAndExperience(discordId);
+    const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
+
+    res.status(200).json({
+      ...user._doc,
+      level: levelData.level,
+      color,
+    });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ error: '無法獲取使用者' });
+  }
+};
+
+// 獲取用戶經驗和等級訊息
+exports.getUserLevelAndExperience = async (req, res) => {
+  const { discordId } = req.params;
+
+  try {
+    const levelData = await getUserLevelAndExperience(discordId);
+    res.status(200).json(levelData);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法獲取用戶等級和經驗' });
   }
 };

@@ -46,8 +46,8 @@ function getExperienceToNextLevel(currentLevel, currentExperience, experienceTab
 }
 
 // 取得用戶等級和經驗
-async function getUserLevelAndExperience(userId) {
-  const user = await User.findById(userId);
+async function getUserLevelAndExperience(discordId) {
+  const user = await User.findOne({ discordId });
   if (!user) {
     throw new Error('找不到使用者');
   }
@@ -55,7 +55,8 @@ async function getUserLevelAndExperience(userId) {
   const level = getLevelForExperience(experience, experienceTable); // 使用經驗表計算等級
   const experienceToNextLevel = getExperienceToNextLevel(level, experience, experienceTable);
   const currentLevelExperience = experienceTable[level];
-  return { level, experience, experienceToNextLevel, currentLevelExperience };
+  const nextLevelExperience = experienceTable[level + 1] || currentLevelExperience;
+  return { level, experience, experienceToNextLevel, currentLevelExperience, nextLevelExperience };
 }
 
 module.exports = {

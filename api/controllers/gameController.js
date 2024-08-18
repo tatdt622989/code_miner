@@ -182,6 +182,26 @@ exports.listRafflePools = async (req, res) => {
   }
 }
 
+// 取得特定抽獎池
+exports.getRafflePool = async (req, res) => {
+  const { poolId } = req.params;
+
+  if (!poolId) {
+    return res.status(400).json({ error: '需要抽獎池ID' });
+  }
+
+  try {
+    const rafflePool = await RafflePool.findById(poolId).populate({
+      path: 'prizes.prize',
+      model: 'Prize',
+    })
+    res.status(200).json(rafflePool);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得抽獎池' });
+  }
+}
+
 // 購買礦場
 exports.buyMine = async (req, res) => {
   const { discordId, mineId } = req.body;
@@ -209,9 +229,83 @@ exports.buyMine = async (req, res) => {
     user.mines.push(mine.id);
     await user.save();
 
-    res.status(200).json({ message: '購買成功', user });
+    const message = `成功購買 ${mine.name}！` +
+    `已自動裝備 ${mine.name} <:${mine.emojiName}:${mine.emojiId}>`;
+
+    res.status(200).json({ message });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法購買礦場' });
   }
-};
+}
+
+// 購買工具
+exports.buyTool = async (req, res) => {
+  const { discordId, toolId } = req.body;
+
+  if (!discordId || !toolId) {
+    return res.status(400).json({ error: '需要用戶ID和工具ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const tool = await Tool.findById(toolId);
+    if (!tool) {
+      return res.status(404).json({ error: '找不到工具' });
+    }
+
+    if (user.currency < tool.price) {
+      return res.status(400).json({ error: '貨幣不足' });
+    }
+
+    user.currency -= tool.price;
+    user.tools.push(tool.id);
+    user.equipped.tool = tool.id;
+    await user.save();
+
+    const message = `成功購買 ${tool.name}！` +
+    `已自動裝備 ${tool.name} <:${tool.emojiName}:${tool.emojiId}>`;
+
+    res.status(200).json({ message });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法購買工具' });
+  }
+}
+
+// 購買鑰匙
+exports.buyKey = async (req, res) => {
+  const { discordId, num } = req.body;
+
+  if (!discordId) {
+    return res.status(400).json({ error: '需要用戶ID' });
+  }
+
+  const keyPrice = 5000;
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    if (user.currency < keyPrice * num) {
+      return res.status(400).json({ error: '貨幣不足' });
+    }
+
+    user.currency -= keyPrice * Number(num);
+
+    // 增加鑰匙
+    user.raffleTicket += Number(num);
+
+    await user.save();
+
+    res.status(200).json({ message: '成功購買 ' + num + ' 把鑰匙！', user });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法購買鑰匙' });
+  }
+}

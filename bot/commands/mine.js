@@ -56,15 +56,22 @@ module.exports = {
       .setEmoji(equippedTool.emojiId)
       .setLabel('挖礦')
       .setStyle('Primary');
-    const actionRow = new ActionRowBuilder().addComponents(button);
 
     // 個人資料按鈕
     const profileButton = new ButtonBuilder()
       .setCustomId('profile')
       .setEmoji('📜')
       .setLabel('個人資料')
-      .setStyle('Secondary');
-    actionRow.addComponents(profileButton);
+      .setStyle('Primary');
+
+    // 商店按鈕
+    const storeButton = new ButtonBuilder()
+      .setCustomId('store')
+      .setEmoji('1272469167391375411')
+      .setLabel('商店')
+      .setStyle('Primary')
+
+    const actionRow = new ActionRowBuilder().addComponents(button, profileButton, storeButton);
 
     const embed = new EmbedBuilder()
       .setTitle(interaction.user.globalName)

@@ -36,8 +36,10 @@ client.on('message', async message => {
 });
 
 // 執行指令
-async function handleCommand(interaction, commandName) {
+async function handleCommand(interaction, commandName, optionValue) {
   const command = client.commands.get(commandName);
+
+  console.log(`Command: ${commandName}`);
 
   if (!command) {
     console.error(`No command matching ${interaction.commandName} was found.`);
@@ -68,11 +70,13 @@ async function handleCommand(interaction, commandName) {
   setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
 
   try {
-    await command.execute(interaction);
+    await command.execute(interaction, optionValue);
   } catch (error) {
     console.error(error);
     await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
   }
+
+  return;
 }
 
 client.on('interactionCreate', async interaction => {
@@ -81,7 +85,8 @@ client.on('interactionCreate', async interaction => {
       await handleCommand(interaction, interaction.commandName);
   } else if (interaction.isButton()) {
       // 處理按鈕
-      await handleCommand(interaction, interaction.customId);
+      const [command, ...optionValue] = interaction.customId.split('_');
+      await handleCommand(interaction, command, optionValue);
   }
 });
 

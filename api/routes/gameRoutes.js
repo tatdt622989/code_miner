@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // controllers
-const { mine, listMines, listTool, listTools, listRafflePools, buyMine } = require('../controllers/gameController');
+const { mine, listMines, listTool, listTools, listRafflePools, buyMine, buyTool, buyKey, getRafflePool } = require('../controllers/gameController');
 
 // 挖礦
 router.get('/mine/:discordId', mine);
@@ -19,7 +19,16 @@ router.get('/tool/:toolId', listTool);
 // 抽獎池列表
 router.get('/rafflePools', listRafflePools);
 
+// 特定抽獎池
+router.get('/rafflePool/:poolId', getRafflePool);
+
 // 購買礦場
 router.post('/buyMine', buyMine);
+
+// 購買工具
+router.post('/buyTool', buyTool);
+
+// 購買鑰匙
+router.post('/buyKey', buyKey);
 
 module.exports = router;

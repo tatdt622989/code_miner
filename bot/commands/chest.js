@@ -36,7 +36,7 @@ module.exports = {
     const prizes = chest.data.prizes.sort((a, b) => a.rarity - b.rarity);
     const msg = `擁有的鑰匙數量: **${user.data.raffleTicket}** <:key:1274402290006233088>\n\n` +
     `寶箱內容機率: \n\n` +
-    `${prizes.map(prize => `<:${prize.prize.emojiName}:${prize.prize.emojiId}> ${prize.prize.name} ${prize.prize.command ? '(序號)' : ''} - **${prize.rarity}%**`).join('\n')}`;
+    `${prizes.map(prize => `<:${prize.prize.emojiName}:${prize.prize.emojiId}> ${prize.prize.name} ${prize.prize.command ? '(MC獎品)' : ''} - **${prize.rarity}%**`).join('\n')}`;
     const embed = new EmbedBuilder()
       .setTitle(chest.data.name)
       .setDescription(msg)

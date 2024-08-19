@@ -1,6 +1,6 @@
 // models
-const { Mineral, Tool, Mine, Prize, RafflePool } = require('../models/Game');
-const { User } = require('../models/User');
+const { Mineral, Tool, Mine, Prize, RafflePool, Code } = require('../models/Game');
+const { User, UserPrize } = require('../models/User');
 
 // utils
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
@@ -307,5 +307,92 @@ exports.buyKey = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法購買鑰匙' });
+  }
+}
+
+function codeGenerator(length) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(getRandomInt(0, characters.length - 1));
+  }
+  return result;
+}
+
+// 抽寶箱
+exports.openChest = async (req, res) => {
+  const { discordId, chestId } = req.body;
+
+  if (!discordId || !chestId) {
+    return res.status(400).json({ error: '需要用戶ID和寶箱ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const chest = await RafflePool.findById(chestId).populate({
+      path: 'prizes.prize',
+      model: 'Prize',
+    });
+
+    if (!chest) {
+      return res.status(404).json({ error: '找不到寶箱' });
+    }
+
+    // 檢查鑰匙數量
+    if (user.raffleTicket < chest.raffleTicket) {
+      return res.status(400).json({ error: '鑰匙不足' });
+    }
+
+    // 扣除鑰匙
+    user.raffleTicket -= chest.raffleTicket;
+
+    // 抽獎
+    const prize = getRandomItem(chest.prizes);
+
+    // 新增到抽獎紀錄
+    const newUserPrize = new UserPrize({
+      prize: prize.prize.id,
+      user: user.id,
+    });
+
+    // 如果是金幣，增加金幣
+    if (prize.prize.value) {
+      user.currency += prize.prize.value;
+      newUserPrize.value = prize.prize.value;
+    }
+
+    // 如果是序號，增加序號
+    let code;
+    if (prize.prize.command) {
+      code = codeGenerator(10);
+      //檢查是否有重複的序號
+      while (await Code.findOne({ code })) {
+        code = codeGenerator(10);
+      }
+      const newCode = new Code({
+        code,
+        used: false,
+        command: prize.prize.command,
+        item: prize.prize.name,
+      });
+
+      await newCode.save();
+
+      newUserPrize.code = code;
+      newUserPrize.command = prize.prize.command;
+    }
+    await newUserPrize.save();
+
+    await user.save();
+
+    res.status(200).json({ prize, user, code });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法開啟寶箱' });
   }
 }

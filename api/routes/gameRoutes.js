@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // controllers
-const { mine, listMines, listTool, listTools, listRafflePools, buyMine, buyTool, buyKey, getRafflePool } = require('../controllers/gameController');
+const { mine, listMines, listTool, listTools, listRafflePools, buyMine, buyTool, buyKey, getRafflePool, openChest } = require('../controllers/gameController');
 
 // 挖礦
 router.get('/mine/:discordId', mine);
@@ -30,5 +30,8 @@ router.post('/buyTool', buyTool);
 
 // 購買鑰匙
 router.post('/buyKey', buyKey);
+
+// 開啟寶箱
+router.post('/lottery/open', openChest);
 
 module.exports = router;

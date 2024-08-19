@@ -26,9 +26,6 @@ module.exports = {
     const itemId = optionValue && optionValue[1] || interaction.options?.getString('item_id');
     let msg = '';
 
-    console.log('item', item);
-    console.log('itemId', itemId);
-
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`).catch(() => { return { data: null }; });
     if (!user.data) {

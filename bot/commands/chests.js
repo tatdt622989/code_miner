@@ -58,11 +58,16 @@ module.exports = {
 
     const lastMessage = interaction.message;
     if (lastMessage) {
-      await lastMessage.edit({
-        embeds: [embed],
-        components: actionRow,
-      });
-      return interaction.deferUpdate();
+      // 如果不能修改訊息，就跳過
+      try {
+        await lastMessage.edit({
+          embeds: [embed],
+          components: actionRow,
+        });
+        return interaction.deferUpdate();
+      } catch (error) {
+        console.error(error?.rawError?.message);
+      }
     }
     await interaction.reply({
       embeds: [embed],

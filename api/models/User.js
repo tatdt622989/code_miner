@@ -76,16 +76,21 @@ const prizeSchema = new mongoose.Schema({
   },
   code: {
     type: String,
-    required: true,
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  value: {
+    type: Number,
+  },
+  command: {
+    type: String,
+  },
 }, { timestamps: true });
 
 const User = db.model('User', userSchema);
-const UserPrize = reisuiDb.model('UserPrize', prizeSchema);
+const UserPrize = db.model('UserPrize', prizeSchema);
 
 module.exports = { User, UserPrize };
 

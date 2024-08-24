@@ -4,7 +4,7 @@ const { User, UserPrize } = require('../models/User');
 
 // utils
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
-const  { getRandomInt, getRandomItem } = require('../utils/randomUtil');
+const { getRandomInt, getRandomItem, getRandomFloat } = require('../utils/randomUtil');
 
 // 挖礦
 exports.mine = async (req, res) => {
@@ -44,10 +44,10 @@ exports.mine = async (req, res) => {
     const tool = await Tool.findById(user.equipped.tool);
 
     // 檢查等級需求
-    const userLevel = await getUserLevelAndExperience(discordId);
-    if (userLevel.level < mine.levelRequirement) {
-      return res.status(400).json({ error: `等級需求：${mine.levelRequirement}，你的等級：${userLevel.level}` });
-    }
+    const userLevel = getUserLevelAndExperience(user);
+    // if (userLevel.level < mine.levelRequirement) {
+    //   return res.status(400).json({ error: `等級需求：${mine.levelRequirement}，你的等級：${userLevel.level}` });
+    // }
 
     // 挖礦
     const minerals = [];
@@ -60,11 +60,15 @@ exports.mine = async (req, res) => {
       const num = getRandomInt(1, maxDropAmount); // 掉落數量
       exp += mineral.mineral.exp * num; // 獲得經驗
 
-      // 如果礦物已存在，增加數量
+      // 如果礦物已存在，增加1/4機率增加掉落數量
       const existingMineral = minerals.find(m => m.name === mineral.mineral.name);
       if (existingMineral) {
-        existingMineral.num += num;
-        existingMineral.totalValue += mineral.mineral.value * num;
+        if (Math.random() < 0.25) {
+          existingMineral.num += num;
+          existingMineral.totalValue += mineral.mineral.value * num;
+          existingMineral.totalExp += mineral.mineral.exp * num;
+          continue;
+        }
         continue;
       }
       minerals.push({
@@ -78,7 +82,7 @@ exports.mine = async (req, res) => {
       });
     }
 
-    const userObj = user;
+    const userObj = user._doc;
 
     // 紀錄獲得前的經驗、等級
     userObj.prevExp = user.experience;
@@ -91,11 +95,39 @@ exports.mine = async (req, res) => {
     const totalValue = minerals.reduce((acc, cur) => acc + cur.totalValue, 0);
     user.currency += totalValue;
 
+    // 檢查是否升等，若升等，增加金幣
+    const { level, levelUpRewards, nextLevelExperience, experience } = getUserLevelAndExperience(user);
+    if (level > userObj.prevLevel) {
+      user.currency += levelUpRewards
+    }
+
+    // 檢查是否為當日首次挖礦，獲得一把鑰匙，每天0點重置，轉換成Taipei時間
+    let now = new Date();
+    now.setHours(now.getHours() + 8);
+    const zeroToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const lastMineDate = user.lastMine || new Date(0);
+    if (zeroToday > lastMineDate) {
+      user.raffleTicket += 1;
+      user.lastMine = now;
+    }
+
     await user.save();
 
-    userObj.level = (await getUserLevelAndExperience(discordId)).level;
+    userObj.level = level;
 
-    res.status(200).json({ minerals, totalValue, user: userObj, totalExp: exp });
+    res.status(200).json({
+      minerals, totalValue,
+      user: userObj,
+      totalExp: exp,
+      tool,
+      mine,
+      isLevelUp: level > userObj.prevLevel,
+      levelUpRewards,
+      level,
+      experience,
+      nextLevelExperience,
+      isDailyFirstMine: zeroToday > lastMineDate,
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法挖礦' });
@@ -227,10 +259,12 @@ exports.buyMine = async (req, res) => {
 
     user.currency -= mine.price;
     user.mines.push(mine.id);
+    user.equipped.mine = mine.id;
+
     await user.save();
 
     const message = `成功購買 ${mine.name}！` +
-    `已自動裝備 ${mine.name} <:${mine.emojiName}:${mine.emojiId}>`;
+      `已自動裝備 ${mine.name} <:${mine.emojiName}:${mine.emojiId}>`;
 
     res.status(200).json({ message });
   } catch (error) {
@@ -268,7 +302,7 @@ exports.buyTool = async (req, res) => {
     await user.save();
 
     const message = `成功購買 ${tool.name}！` +
-    `已自動裝備 ${tool.name} <:${tool.emojiName}:${tool.emojiId}>`;
+      `已自動裝備 ${tool.name} <:${tool.emojiName}:${tool.emojiId}>`;
 
     res.status(200).json({ message });
   } catch (error) {
@@ -394,5 +428,47 @@ exports.openChest = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法開啟寶箱' });
+  }
+}
+
+// 賭博
+exports.bet = async (req, res) => {
+  const { discordId, magnification, amount } = req.body;
+  const allowedMagnifications = [2, 3, 5];
+  const probability = [0.5, 0.25, 0.12];
+
+  if (!discordId || !magnification || !amount) {
+    return res.status(400).json({ error: '需要用戶ID、倍率和金幣數量' });
+  }
+
+
+  if (!allowedMagnifications.includes(magnification)) {
+    return res.status(400).json({ error: '不允許的倍率' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    if (user.currency < amount) {
+      return res.status(400).json({ error: '金幣不足' });
+    }
+
+    user.currency -= amount;
+
+    // 檢查是否中獎
+    const isWin = getRandomFloat(0, 1) < probability[allowedMagnifications.indexOf(magnification)];
+    if (isWin) {
+      user.currency += amount * magnification;
+    }
+
+    await user.save();
+
+    res.status(200).json({ isWin, user });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法賭博' });
   }
 }

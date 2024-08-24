@@ -66,6 +66,10 @@ const userSchema = new mongoose.Schema({
   equipped: {
     type: equippedSchema,
   },
+  lastMine: {
+    type: Date,
+    default: new Date(0),
+  },
 }, { timestamps: true });
 
 // 獎品紀錄

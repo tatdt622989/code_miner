@@ -26,9 +26,10 @@ module.exports = {
 
     // 挖礦
     const res = await axios.get(`${process.env.API_URL}/game/mine/${discordId}`);
-    const { minerals, totalValue, totalExp } = res.data;
+    const { minerals, totalValue, totalExp, tool, isLevelUp, levelUpRewards, level, experience, nextLevelExperience, isDailyFirstMine } = res.data;
 
-    const user = Object.assign({}, pervUser.data, res.data.user);
+    // 合併物件
+    const user = { ...pervUser.data, ...res.data.user };
 
     // 訊息輸出
     let msg = '你挖到了 \n\n' +
@@ -37,23 +38,23 @@ module.exports = {
       `經驗: **${totalExp}**`;
 
     // 經驗條
-    const { level, experience, experienceToNextLevel, currentLevelExperience, nextLevelExperience } = (await axios.get(`${process.env.API_URL}/users/expLevel/${discordId}`)).data;
     const expBar = `**${experience}** / **${nextLevelExperience}**`;
     msg += `\n\n等級: **${level}**\n${expBar}`;
 
     // 如果等級提升，輸出訊息
-    const levelUp = user.level > user.prevLevel;
-    if (levelUp) {
-      msg += `\n\n恭喜你升到了 **等級 ${user.level}**!`;
+    if (isLevelUp) {
+      msg += `\n\n恭喜你升到了 **等級 ${user.level}**!\n獲得升等獎勵: **${levelUpRewards}** <:coin:1271510831359852709>`;
     }
 
-    // 取得使用者預設工具
-    const equippedTool = pervUser.data.equipped.tool;
+    // 如果是每日第一次挖礦，輸出訊息
+    if (isDailyFirstMine) {
+      msg += '\n\n這是你今天第一次挖礦，獲得了 1 x <:key:1274402290006233088> 鑰匙!';
+    }
 
     // 挖礦按鈕
     const button = new ButtonBuilder()
       .setCustomId('mine')
-      .setEmoji(equippedTool.emojiId)
+      .setEmoji(tool.emojiId)
       .setLabel('挖礦')
       .setStyle('Primary');
 
@@ -75,7 +76,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle(interaction.user.globalName)
-      .setColor(user.color || 0x000000)
+      .setColor(user.color || 0x686D76)
       .setDescription(msg);
 
     await interaction.reply({

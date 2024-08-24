@@ -48,7 +48,21 @@ module.exports = {
       .setLabel('抽寶箱')
       .setStyle('Primary');
 
-    const actionRow = new ActionRowBuilder().addComponents(button, storeButton, chestsButton);
+    // 排行榜按鈕
+    const rankingButton = new ButtonBuilder()
+      .setCustomId('ranking')
+      .setEmoji('1275428610299134035')
+      .setLabel('排行榜')
+      .setStyle('Primary');
+
+    // 以小博大按鈕
+    const betButton = new ButtonBuilder()
+      .setCustomId('bet')
+      .setEmoji('🎲')
+      .setLabel('以小博大')
+      .setStyle('Primary');
+
+    const actionRow = new ActionRowBuilder().addComponents(button, storeButton, chestsButton, rankingButton, betButton);
 
     // 訊息輸出
     const embed = new EmbedBuilder()

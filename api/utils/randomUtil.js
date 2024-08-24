@@ -34,5 +34,6 @@ const getRandomItem = (array) => {
 
 module.exports = {
 	getRandomInt,
-	getRandomItem
+	getRandomItem,
+	getRandomFloat
 };

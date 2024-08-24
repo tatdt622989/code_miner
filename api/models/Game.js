@@ -38,6 +38,11 @@ const mineMineralSchema = new mongoose.Schema({
 		type: Number,
 		required: true,
 	},
+	baseMinDropAmount: {
+		type: Number,
+		required: true,
+		default: 1,
+	},
 });
 
 const mineSchema = new mongoose.Schema({

@@ -8,6 +8,8 @@ const levelColorMap = {
   50: 0x7C00FE,
   75: 0xF9E400,
   100: 0xF5004F,
+  150: 0xFE6E00,
+  200: 0xFFFFFF
 };
 
 // 創建用戶
@@ -22,14 +24,14 @@ exports.createUser = async (req, res) => {
     const newUser = new User({ name, discordId });
     await newUser.save();
 
-    const levelData = await getUserLevelAndExperience(discordId);
+    const levelData = getUserLevelAndExperience(newUser);
     const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
 
-    res.status(201).json({ message: '使用者創建成功', user: {
+    res.status(201).json({
       ...newUser._doc,
       level: levelData.level,
       color,
-    } });
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '使用者創建失敗' });
@@ -40,8 +42,19 @@ exports.createUser = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find();
-    res.status(200).json(users);
+
+    let usersWithLevel = users.map(user => ({ ...user._doc }))
+    for (const user of usersWithLevel) {
+      const levelData = getUserLevelAndExperience(user);
+      const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
+      user.level = levelData.level;
+      user.color = color;
+    }
+    usersWithLevel = usersWithLevel.sort((a, b) => b.level - a.level);
+
+    res.status(200).json(usersWithLevel);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ error: '無法獲取使用者' });
   }
 };
@@ -63,7 +76,7 @@ exports.getUser = async (req, res) => {
       return res.status(404).json({ error: '找不到使用者' });
     }
 
-    const levelData = await getUserLevelAndExperience(discordId);
+    const levelData = getUserLevelAndExperience(user);
     const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
 
     res.status(200).json({
@@ -82,7 +95,8 @@ exports.getUserLevelAndExperience = async (req, res) => {
   const { discordId } = req.params;
 
   try {
-    const levelData = await getUserLevelAndExperience(discordId);
+    const user = await User.findOne({ discordId });
+    const levelData = getUserLevelAndExperience(user);
     res.status(200).json(levelData);
   } catch (error) {
     console.log(error);

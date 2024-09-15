@@ -80,6 +80,11 @@ async function handleCommand(interaction, commandName, optionValue) {
 }
 
 client.on('interactionCreate', async interaction => {
+  // 開發環境下，只回應指定伺服器的指令
+  if (process.env.NODE_ENV === 'development' && process.env.DISCORD_GUILD_ID && interaction.guildId !== process.env.DISCORD_GUILD_ID) {
+    console.log(`User: ${interaction.user.globalName} (${interaction.user.id}) tried to use command in a different guild.`);
+    return interaction.reply({ content: '虛寶探險維護中，請稍後再試。', ephemeral: true });
+  }
   if (interaction.isCommand()) {
       // 處理指令
       await handleCommand(interaction, interaction.commandName);

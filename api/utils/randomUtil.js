@@ -6,7 +6,7 @@ const getRandomFloat = (min, max) => {
   crypto.randomFillSync(array);
   const randomNumber = array[0] / (0xFFFFFFFF + 1); // 轉換為0-1之間的數字
   const result = (randomNumber * (max - min) + min).toFixed(2); // 保留兩位小數
-  return parseFloat(result) <= min ? parseFloat(result) + 0.01 : parseFloat(result);
+  return parseFloat(result);
 };
 
 // 生成安全的隨機整數

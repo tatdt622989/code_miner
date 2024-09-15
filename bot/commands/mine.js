@@ -26,7 +26,7 @@ module.exports = {
 
     // 挖礦
     const res = await axios.get(`${process.env.API_URL}/game/mine/${discordId}`);
-    const { minerals, totalValue, totalExp, tool, isLevelUp, levelUpRewards, level, experience, nextLevelExperience, isDailyFirstMine } = res.data;
+    const { minerals, totalValue, totalExp, tool, isLevelUp, levelUpRewards, level, experience, nextLevelExperience, isDailyFirstMine, petReward, pet } = res.data;
 
     // 合併物件
     const user = { ...pervUser.data, ...res.data.user };
@@ -40,6 +40,16 @@ module.exports = {
     // 經驗條
     const expBar = `**${experience}** / **${nextLevelExperience}**`;
     msg += `\n\n等級: **${level}**\n${expBar}`;
+
+    // 寵物事件
+    if(petReward) {
+      if (petReward.type === 'coin') {
+        msg += `\n\n你的寵物 <:${pet.emojiName}:${pet.emojiId}>${pet.name} 幫你撿到了 **${petReward.value}** <:coin:1271510831359852709>!`;
+      }
+      if (petReward.type === 'code') {
+        msg += `\n\n你的寵物 <:${pet.emojiName}:${pet.emojiId}>${pet.name} 帶回來了 <:${petReward.emojiName}:${petReward.emojiId}>**${petReward.item}** !  \`(mc物品)\``;
+      }
+    }
 
     // 如果等級提升，輸出訊息
     if (isLevelUp) {
@@ -83,5 +93,12 @@ module.exports = {
       embeds: [embed],
       components: [actionRow],
     });
+
+    if (petReward && petReward.type === 'code') {
+      await interaction.followUp({
+        content: `恭喜你獲得了 <:${petReward.emojiName}:${petReward.emojiId}>**${petReward.item}** !\n\n 請到ReiSui伺服器中輸入\n\`\`\`/code ${petReward.code}\`\`\`\n兌換Minecraft獎品!\n請先截圖保存，未來會更新查詢獲獎記錄功能!`,
+        ephemeral: true,
+      });
+    }
   },
 };

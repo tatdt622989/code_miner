@@ -40,6 +40,12 @@ module.exports = {
       .setLabel('購買礦場')
       .setStyle('Primary');
 
+    const petButton = new ButtonBuilder()
+      .setCustomId('buy_pet')
+      .setEmoji('1283811816509800458')
+      .setLabel('購買寵物')
+      .setStyle('Primary');
+
     const keyButton = new ButtonBuilder()
       .setCustomId('buy_key')
       .setEmoji('1274402290006233088')
@@ -51,7 +57,7 @@ module.exports = {
       .setLabel('返回')
       .setStyle('Secondary');
 
-    const actionRow = new ActionRowBuilder().addComponents(toolButton, mineButton, keyButton);
+    const actionRow = new ActionRowBuilder().addComponents(toolButton, mineButton, petButton, keyButton);
 
     const lastMessage = interaction.message;
     if (lastMessage) {

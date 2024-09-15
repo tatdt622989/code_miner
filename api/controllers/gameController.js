@@ -1,5 +1,5 @@
 // models
-const { Mineral, Tool, Mine, Prize, RafflePool, Code } = require('../models/Game');
+const { Mineral, Tool, Mine, Prize, RafflePool, Code, Pet } = require('../models/Game');
 const { User, UserPrize } = require('../models/User');
 
 // utils
@@ -81,6 +81,69 @@ exports.mine = async (req, res) => {
         emojiName: mineral.mineral.emojiName,
       });
     }
+    user.experience += exp;
+    const totalValue = minerals.reduce((acc, cur) => acc + cur.totalValue, 0);
+    user.currency += totalValue;
+
+    // 寵物事件
+    let petReward = null;
+    let pet = null;
+    if (user.equipped.pet) {
+      pet = await Pet.findById(user.equipped.pet);
+      if (pet) {
+        const triggerProbability = pet.triggerProbability;
+        const isTrigger = getRandomFloat(0, 0.99) <= triggerProbability;
+        if (isTrigger) {
+          const type = getRandomItem([{ name: 'coin', rarity: pet.rewardProbability.coin }, { name: 'code', rarity: pet.rewardProbability.code }]);
+          if (type.name === 'coin') {
+            const value = getRandomInt(pet.coinReward.min, pet.coinReward.max);
+            petReward = { type: 'coin', value };
+            user.currency += value;
+          }
+          if (type.name === 'code') {
+            // 取得所有序號獎品
+            const prizes = await Prize.find({ command: { $exists: true, $ne: "" } });
+
+            // 取得符合寵物等級需求的序號獎品
+            const levelPrizes = prizes.filter(p => p.petLevelRequirement <= pet.level);
+            const prizeLength = levelPrizes.length;
+
+            // 隨機取得一個序號獎品
+            const prizeIndex = getRandomInt(0, prizeLength - 1);
+            const prize = levelPrizes[prizeIndex];
+
+            // 產生序號
+            let code = codeGenerator(10);
+            //檢查是否有重複的序號
+            while (await Code.findOne({ code })) {
+              code = codeGenerator(10);
+            }
+
+            // 新增序號
+            const newCode = new Code({
+              code,
+              used: false,
+              command: prize.command,
+              item: prize.name,
+            });
+            await newCode.save();
+
+            petReward = { type: 'code', code, command: prize.command, item: prize.name, emojiId: prize.emojiId, emojiName: prize.emojiName };
+
+            // 新增到獎品紀錄
+            const newUserPrize = new UserPrize({
+              prize: prize.id,
+              user: user.id,
+              code,
+              command: prize.command,
+              origin: 'pet',
+            });
+            await newUserPrize.save();
+          }
+        }
+      }
+    }
+    console.log(petReward);
 
     const userObj = user._doc;
 
@@ -88,18 +151,12 @@ exports.mine = async (req, res) => {
     userObj.prevExp = user.experience;
     userObj.prevLevel = userLevel.level;
 
-    // 獲得經驗
-    user.experience += exp;
-
-    // 獲得貨幣
-    const totalValue = minerals.reduce((acc, cur) => acc + cur.totalValue, 0);
-    user.currency += totalValue;
-
     // 檢查是否升等，若升等，增加金幣
     const { level, levelUpRewards, nextLevelExperience, experience } = getUserLevelAndExperience(user);
     if (level > userObj.prevLevel) {
       user.currency += levelUpRewards
     }
+    userObj.level = level;
 
     // 檢查是否為當日首次挖礦，獲得一把鑰匙，每天0點重置，轉換成Taipei時間
     let now = new Date();
@@ -113,8 +170,6 @@ exports.mine = async (req, res) => {
 
     await user.save();
 
-    userObj.level = level;
-
     res.status(200).json({
       minerals, totalValue,
       user: userObj,
@@ -127,6 +182,8 @@ exports.mine = async (req, res) => {
       experience,
       nextLevelExperience,
       isDailyFirstMine: zeroToday > lastMineDate,
+      petReward,
+      pet
     });
   } catch (error) {
     console.log(error);
@@ -203,6 +260,49 @@ exports.listTool = async (req, res) => {
   }
 }
 
+// 寵物列表
+exports.listPets = async (req, res) => {
+  const { discordId } = req.params;
+
+  if (!discordId) {
+    return res.status(400).json({ error: '需要用戶ID' });
+  }
+
+  try {
+    const pets = await Pet.find();
+    // 玩家已擁有的寵物
+    const user = await User.findOne({ discordId }).populate('pets');
+    const userPets = user.pets.map(pet => pet.id);
+    const petsWithUser = pets.map(pet => {
+      return {
+        ...pet._doc,
+        owned: userPets.includes(pet.id),
+      }
+    });
+    res.status(200).json(petsWithUser);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得寵物列表' });
+  }
+}
+
+// 特定寵物
+exports.listPet = async (req, res) => {
+  const { petId } = req.params;
+
+  if (!petId) {
+    return res.status(400).json({ error: '需要寵物ID' });
+  }
+
+  try {
+    const pet = await Pet.findById(petId);
+    res.status(200).json(pet);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得寵物' });
+  }
+}
+
 // 抽獎池列表
 exports.listRafflePools = async (req, res) => {
   try {
@@ -243,7 +343,10 @@ exports.buyMine = async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ discordId });
+    const user = await User.findOne({ discordId }).populate({
+      path: 'equipped.mine',
+      model: 'Mine',
+    })
     if (!user) {
       return res.status(404).json({ error: '找不到使用者' });
     }
@@ -257,14 +360,21 @@ exports.buyMine = async (req, res) => {
       return res.status(400).json({ error: '貨幣不足' });
     }
 
+    if (user.mines.includes(mine.id)) {
+      return res.status(400).json({ error: '已擁有此礦場' });
+    }
+
+    let message = `成功購買 ${mine.name}！`;
+
     user.currency -= mine.price;
     user.mines.push(mine.id);
-    user.equipped.mine = mine.id;
+    // 如購買的礦場價格低於已裝備的礦場，則不自動裝備
+    if (user.equipped?.mine?.price <= mine.price || !user.equipped.mine) {
+      user.equipped.mine = mine.id;
+      message += `\n已自動裝備 ${mine.name} <:${mine.emojiName}:${mine.emojiId}>`;
+    }
 
     await user.save();
-
-    const message = `成功購買 ${mine.name}！` +
-      `已自動裝備 ${mine.name} <:${mine.emojiName}:${mine.emojiId}>`;
 
     res.status(200).json({ message });
   } catch (error) {
@@ -282,7 +392,10 @@ exports.buyTool = async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ discordId });
+    const user = await User.findOne({ discordId }).populate({
+      path: 'equipped.tool',
+      model: 'Tool',
+    });
     if (!user) {
       return res.status(404).json({ error: '找不到使用者' });
     }
@@ -296,13 +409,20 @@ exports.buyTool = async (req, res) => {
       return res.status(400).json({ error: '貨幣不足' });
     }
 
+    if (user.tools.includes(tool.id)) {
+      return res.status(400).json({ error: '已擁有此工具' });
+    }
+
+    let message = `成功購買 ${tool.name}！`;
+
     user.currency -= tool.price;
     user.tools.push(tool.id);
-    user.equipped.tool = tool.id;
+    // 如購買的工具價格低於已裝備的工具，則不自動裝備
+    if (user.equipped?.tool?.price <= tool.price || !user.equipped.tool) {
+      user.equipped.tool = tool.id;
+      message += `\n已自動裝備 ${tool.name} <:${tool.emojiName}:${tool.emojiId}>`;
+    }
     await user.save();
-
-    const message = `成功購買 ${tool.name}！` +
-      `已自動裝備 ${tool.name} <:${tool.emojiName}:${tool.emojiId}>`;
 
     res.status(200).json({ message });
   } catch (error) {
@@ -341,6 +461,55 @@ exports.buyKey = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法購買鑰匙' });
+  }
+}
+
+// 購買寵物
+exports.buyPet = async (req, res) => {
+  const { discordId, petId } = req.body;
+
+  if (!discordId || !petId) {
+    return res.status(400).json({ error: '需要用戶ID和寵物ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate({
+      path: 'equipped.pet',
+      model: 'Pet',
+    });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const pet = await Pet.findById(petId);
+    if (!pet) {
+      return res.status(404).json({ error: '找不到寵物' });
+    }
+
+    if (user.currency < pet.price) {
+      return res.status(400).json({ error: '貨幣不足' });
+    }
+
+    if (user.pets.includes(pet.id)) {
+      return res.status(400).json({ error: '已擁有此寵物' });
+    }
+
+    let message = `成功購買 ${pet.name}！`;
+
+    user.currency -= pet.price;
+    user.pets.push(pet.id);
+    // 如購買的寵物價格低於已裝備的寵物，則不自動裝備
+    if (user.equipped?.pet?.price <= pet.price || !user.equipped.pet) {
+      user.equipped.pet = pet.id;
+      message += `\n<:${pet.emojiName}:${pet.emojiId}> **${pet.name}** 已開始跟隨你！`;
+    }
+
+    await user.save();
+
+    res.status(200).json({ message });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法購買寵物' });
   }
 }
 
@@ -459,7 +628,7 @@ exports.bet = async (req, res) => {
     user.currency -= amount;
 
     // 檢查是否中獎
-    const isWin = getRandomFloat(0, 1) < probability[allowedMagnifications.indexOf(magnification)];
+    const isWin = getRandomFloat(0, 0.99) <= probability[allowedMagnifications.indexOf(magnification)];
     if (isWin) {
       user.currency += amount * magnification;
     }

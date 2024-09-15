@@ -71,7 +71,10 @@ exports.getUser = async (req, res) => {
     }).populate({
       path: 'equipped.mine',
       model: 'Mine',
-    });
+    }).populate({
+      path: 'equipped.pet',
+      model: 'Pet',
+    })
     if (!user) {
       return res.status(404).json({ error: '找不到使用者' });
     }

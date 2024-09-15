@@ -11,19 +11,11 @@ const equippedSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Mine',
   },
+  pet: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Pet',
+  },
 });
-
-// 玩家礦石
-// const userMineralsSchema = new mongoose.Schema({
-//   num: {
-//     type: Number,
-//     default: 0,
-//   },
-//   mineral: {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: 'Mineral',
-//   }
-// });
 
 // 玩家
 const userSchema = new mongoose.Schema({
@@ -60,9 +52,12 @@ const userSchema = new mongoose.Schema({
       ref: 'Mine',
     }
   ],
-  // minerals: [{
-  //   type: userMineralsSchema,
-  // }],
+  pets: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Pet',
+    }
+  ],
   equipped: {
     type: equippedSchema,
   },
@@ -89,6 +84,9 @@ const prizeSchema = new mongoose.Schema({
     type: Number,
   },
   command: {
+    type: String,
+  },
+  origin: {
     type: String,
   },
 }, { timestamps: true });

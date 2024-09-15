@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder } = require('discord.js');
 const axios = require('axios');
+const formatWithThousandSeparators = require('../utils/formatWithThousandSeparators');
 
 require('dotenv').config();
 
@@ -22,10 +23,11 @@ module.exports = {
     const expBar = `**${experience}** / **${nextLevelExperience}**`;
 
     const msg = `等級: **${level}**\n${expBar}\n\n` +
-      `金幣 : **${user.data.currency}** <:coin:1271510831359852709>\n` +
+      `金幣 : **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
       `鑰匙 : **${user.data.raffleTicket}** <:key:1274402290006233088>\n` +
       `裝備工具 : **${user.data.equipped.tool.name}** <:${user.data.equipped.tool.emojiName}:${user.data.equipped.tool.emojiId}>\n` +
-      `裝備礦場 : **${user.data.equipped.mine.name}** <:${user.data.equipped.mine.emojiName}:${user.data.equipped.mine.emojiId}>`;
+      `裝備礦場 : **${user.data.equipped.mine.name}** <:${user.data.equipped.mine.emojiName}:${user.data.equipped.mine.emojiId}>\n` +
+      `裝備寵物 : ${user.data.equipped.pet ? `**${user.data.equipped.pet.name}** <:${user.data.equipped.pet.emojiName}:${user.data.equipped.pet.emojiId}>` : '無'}`;
 
     // 挖礦按鈕
     const button = new ButtonBuilder()

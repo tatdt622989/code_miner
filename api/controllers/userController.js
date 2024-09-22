@@ -9,7 +9,9 @@ const levelColorMap = {
   75: 0xF9E400,
   100: 0xF5004F,
   150: 0xFE6E00,
-  200: 0xFFFFFF
+  200: 0xFFFFFF,
+  250: 0x00ffd0,
+  300: 0xb00000,
 };
 
 // 創建用戶
@@ -25,7 +27,7 @@ exports.createUser = async (req, res) => {
     await newUser.save();
 
     const levelData = getUserLevelAndExperience(newUser);
-    const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
+    const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level <= level)[1];
 
     res.status(201).json({
       ...newUser._doc,
@@ -46,7 +48,7 @@ exports.getUsers = async (req, res) => {
     let usersWithLevel = users.map(user => ({ ...user._doc }))
     for (const user of usersWithLevel) {
       const levelData = getUserLevelAndExperience(user);
-      const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
+      const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level <= level)[1];
       user.level = levelData.level;
       user.color = color;
     }
@@ -80,7 +82,7 @@ exports.getUser = async (req, res) => {
     }
 
     const levelData = getUserLevelAndExperience(user);
-    const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level < level)[1];
+    const color = Object.entries(levelColorMap).find(([level, _]) => levelData.level <= level)[1];
 
     res.status(200).json({
       ...user._doc,

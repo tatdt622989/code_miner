@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const getRandomFloat = (min, max) => {
   const array = new Uint32Array(1);
   crypto.randomFillSync(array);
-  const randomNumber = array[0] / (0xFFFFFFFF + 1); // 轉換為0-1之間的數字
+  const randomNumber = array[0] / (0xFFFFFFFF); // 轉換為0-1之間的數字
   const result = (randomNumber * (max - min) + min).toFixed(2); // 保留兩位小數
   return parseFloat(result);
 };

@@ -19,7 +19,7 @@ module.exports = {
         return interaction.reply({ content: '空', ephemeral: true });
       }
 
-      const users = res.data.slice(0, 10);
+      const users = res.data.slice(0, 15);
 
       const msg = `<:leaderboard:1275428610299134035> 排行榜: \n\n${users.map((user, index) => `${index + 1}. **${user.name}** - 等級: ${user.level} 經驗: ${user.experience}`).join('\n')}`;
 

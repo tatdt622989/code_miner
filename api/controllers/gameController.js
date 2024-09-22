@@ -92,7 +92,7 @@ exports.mine = async (req, res) => {
       pet = await Pet.findById(user.equipped.pet);
       if (pet) {
         const triggerProbability = pet.triggerProbability;
-        const isTrigger = getRandomFloat(0, 0.99) <= triggerProbability;
+        const isTrigger = getRandomFloat(0, 99) <= triggerProbability;
         if (isTrigger) {
           const type = getRandomItem([{ name: 'coin', rarity: pet.rewardProbability.coin }, { name: 'code', rarity: pet.rewardProbability.code }]);
           if (type.name === 'coin') {
@@ -143,7 +143,6 @@ exports.mine = async (req, res) => {
         }
       }
     }
-    console.log(petReward);
 
     const userObj = user._doc;
 

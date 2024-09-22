@@ -97,7 +97,7 @@ module.exports = {
         });
         msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
           `寵物會在你挖礦的時候有機率把道具帶回來\n越高階的寵物，拾獲越好道具的可能性越高\n\n` +
-          `${pets.data.map(pet => `<:${pet.emojiName}:${pet.emojiId}> ${pet.name} - **${pet.owned ? '已擁有' : formatWithThousandSeparators(pet.price) + ' <:coin:1271510831359852709>'}** \n \`拾獲道具機率: ${(pet.triggerProbability * 100).toFixed(2)}% \``).join('\n')}`;
+          `${pets.data.map(pet => `<:${pet.emojiName}:${pet.emojiId}> ${pet.name} - **${pet.owned ? '已擁有' : formatWithThousandSeparators(pet.price) + ' <:coin:1271510831359852709>'}** \n \`拾獲道具機率: ${(pet.triggerProbability).toFixed(2)}% \``).join('\n')}`;
       }
       // 每一行最多5個按鈕
       while (buttonList.length) {

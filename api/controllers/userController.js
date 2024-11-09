@@ -66,7 +66,6 @@ exports.getUser = async (req, res) => {
   const { discordId } = req.params;
 
   try {
-
     const user = await User.findOne({ discordId }).populate({
       path: 'equipped.tool',
       model: 'Tool',

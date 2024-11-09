@@ -15,6 +15,9 @@ module.exports = {
         .addChoices(
           { name: '工具', value: 'tool' },
           { name: '礦場', value: 'mine' },
+          { name: '鑰匙', value: 'key' },
+          { name: '寵物', value: 'pet' },
+          { name: '藥水', value: 'potion' }
         )
     )
     .addStringOption(option =>
@@ -25,7 +28,7 @@ module.exports = {
     const discordId = interaction.user.id;
     const item = optionValue && optionValue[0] || interaction.options?.getString('item');
     const itemId = optionValue && optionValue[1] || interaction.options?.getString('item_id');
-    let msg = '';
+    const itemChildId = optionValue && optionValue[2] || interaction.options?.getString('item_child_id');
 
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`).catch(() => { return { data: null }; });
@@ -35,6 +38,7 @@ module.exports = {
 
     const buttonList = [];
     const actionRow = [];
+    let perRow = 5;
     if (!itemId) {
       if (item === 'tool') {
         const tools = await axios.get(`${process.env.API_URL}/game/tools/${discordId}`).catch(() => { return { data: [] }; });
@@ -98,11 +102,54 @@ module.exports = {
         msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
           `寵物會在你挖礦的時候有機率把道具帶回來\n越高階的寵物，拾獲越好道具的可能性越高\n\n` +
           `${pets.data.map(pet => `<:${pet.emojiName}:${pet.emojiId}> ${pet.name} - **${pet.owned ? '已擁有' : formatWithThousandSeparators(pet.price) + ' <:coin:1271510831359852709>'}** \n \`拾獲道具機率: ${(pet.triggerProbability).toFixed(2)}% \``).join('\n')}`;
+      } else if (item === 'potion') {
+        perRow = 3; // 每一行最多3個按鈕
+        const { potionInfo, timeMap } = await axios.get(`${process.env.API_URL}/game/potions`).then(res => res.data).catch(() => []);
+        // 取得藥水效果
+        const {
+          petTriggerProbabilityDouble = {},
+          miningRewardDouble = {},
+          autoMine = {},
+        } = user.data.potionEffect || {};
+        petTriggerProbabilityDouble.active = new Date(petTriggerProbabilityDouble.end) > new Date();
+        miningRewardDouble.active = new Date(miningRewardDouble.end) > new Date();
+        potionInfo[1].active = petTriggerProbabilityDouble.active;
+        potionInfo[2].active = miningRewardDouble.active;
+        potionInfo[3].active = autoMine.active;
+        Object.keys(potionInfo).forEach(key => {
+          Object.keys(timeMap).forEach(timeKey => {
+            const disabled = potionInfo[key].active || potionInfo[key].price * timeKey > user.data.magicalHerb;
+            const button = new ButtonBuilder()
+              .setCustomId(`buy_potion_${key}_${timeKey}`)
+              .setEmoji(potionInfo[key].emojiId)
+              .setLabel(`${potionInfo[key].name} - ${potionInfo[key].active ? '已使用' : timeMap[timeKey] + '分'}`)
+              .setDisabled(disabled)
+              .setStyle('Primary');
+            buttonList.push(button);
+          });
+        });
+        msg = `擁有魔法藥草: **${user.data.magicalHerb}** <:magical_herb:1302301265950277673>\n` +
+          `同種類藥水需等上一種效果結束後才能再次使用\n\n`;
+        Object.keys(potionInfo).map(key => {
+          const info = potionInfo[key];
+          msg += `<:${info.emojiName}:${info.emojiId}> ${info.name}\n`;
+          Object.keys(timeMap).forEach(timeKey => {
+            let invalidMsg = '';
+            if (info.active) {
+              invalidMsg = '(使用中)';
+            }
+            if (info.price * timeKey > user.data.magicalHerb) {
+              invalidMsg = '(魔法藥草不足)';
+            }
+            msg += `${timeMap[timeKey]}分 - **${formatWithThousandSeparators(info.price * timeKey)} <:magical_herb:1302301265950277673>  ${invalidMsg}** \n`;
+          });
+          msg += `\`效果: ${info.description}\`\n\n`;
+        }).join('\n');
       }
-      // 每一行最多5個按鈕
+      // 每一行按鈕數量
       while (buttonList.length) {
         const row = new ActionRowBuilder();
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < perRow; i++) {
           const button = buttonList.shift();
           if (button) {
             row.addComponents(button);
@@ -121,6 +168,8 @@ module.exports = {
           res = await axios.post(`${process.env.API_URL}/game/buyKey`, { discordId, num: itemId });
         } else if (item === 'pet') {
           res = await axios.post(`${process.env.API_URL}/game/buyPet`, { discordId, petId: itemId });
+        } else if (item === 'potion') {
+          res = await axios.post(`${process.env.API_URL}/game/buyPotion`, { discordId, type: itemId, timeId: itemChildId });
         }
         msg = res.data?.message;
       } catch (err) {

@@ -2,7 +2,24 @@ const express = require('express');
 const router = express.Router();
 
 // controllers
-const { mine, listMines, listTool, listTools, listPet, listPets, listRafflePools, buyMine, buyTool, buyKey, buyPet, getRafflePool, openChest, bet } = require('../controllers/gameController');
+const {
+  mine,
+  listMines,
+  listTool,
+  listTools,
+  listPet,
+  listPets,
+  listRafflePools,
+  listPotion,
+  buyMine,
+  buyTool,
+  buyKey,
+  buyPet,
+  buyPotion,
+  getRafflePool,
+  openChest,
+  bet
+} = require('../controllers/gameController');
 
 // 挖礦
 router.get('/mine/:discordId', mine);
@@ -28,6 +45,9 @@ router.get('/rafflePool/:poolId', getRafflePool);
 // 取得特定寵物
 router.get('/pet/:petId', listPet);
 
+// 取得所有藥水資訊
+router.get('/potions', listPotion);
+
 // 購買礦場
 router.post('/buyMine', buyMine);
 
@@ -39,6 +59,9 @@ router.post('/buyKey', buyKey);
 
 // 購買寵物
 router.post('/buyPet', buyPet);
+
+// 購買藥水
+router.post('/buyPotion', buyPotion);
 
 // 開啟寶箱
 router.post('/lottery/open', openChest);

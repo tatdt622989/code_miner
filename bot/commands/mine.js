@@ -26,23 +26,70 @@ module.exports = {
 
     // 挖礦
     const res = await axios.get(`${process.env.API_URL}/game/mine/${discordId}`);
-    const { minerals, totalValue, totalExp, tool, isLevelUp, levelUpRewards, level, experience, nextLevelExperience, isDailyFirstMine, petReward, pet } = res.data;
+    const {
+      mineResult,
+      autoMineResult,
+      tool,
+      isLevelUp,
+      levelUpRewards,
+      level,
+      experience,
+      nextLevelExperience,
+      isDailyFirstMine,
+      petReward,
+      pet,
+      potionInfo,
+      potionEffect,
+      magicHerbCollected
+    } = res.data;
 
     // 合併物件
     const user = { ...pervUser.data, ...res.data.user };
 
     // 訊息輸出
-    let msg = '你挖到了 \n\n' +
-      `${minerals.map(m => `<:${m.emojiName}:${m.emojiId}>  ${m.name} x ** ${m.num}**`).join('\n')}\n\n` +
-      `價值: **${totalValue}**  <:coin:1271510831359852709>\n` +
-      `經驗: **${totalExp}**`;
+    let msg = '';
+
+    // 挖礦結果
+    let totalValue = mineResult.totalValue;
+    let totalExp = mineResult.totalExp;
+    msg += `你挖到了 \n\n${mineResult.minerals.map(m => `<:${m.emojiName}:${m.emojiId}>  ${m.name} x ** ${m.num}**`).join('\n')}\n\n`;
+
+    // 自動挖礦結果
+    if (autoMineResult.totalValue > 0) {
+      console.log('autoMineResult', autoMineResult);
+      msg += `自動開採藥劑挖到了 \n\n${autoMineResult.minerals.map(m => `<:${m.emojiName}:${m.emojiId}>  ${m.name} x ** ${m.num}**`).join('\n')}\n\n`;
+      totalValue += autoMineResult.totalValue;
+      totalExp += autoMineResult.totalExp;
+    }
+
+    msg +=  `價值: **${totalValue}**  <:coin:1271510831359852709>\n` +
+    `經驗: **${totalExp}**`;
 
     // 經驗條
     const expBar = `**${experience}** / **${nextLevelExperience}**`;
     msg += `\n\n等級: **${level}**\n${expBar}`;
 
+    // 藥水效果
+    let potionEffectMsg = '';
+    const activePotionData = potionEffect.map((p, i) => {
+      const info = potionInfo[i + 1];
+      return { ...p, ...info };
+    }).filter(p => p.active);
+    if (activePotionData.length) {
+      activePotionData.map((info, i) => {
+        potionEffectMsg += `<:${info.emojiName}:${info.emojiId}> **${info.name}**`;
+        if (i + 1 < activePotionData.length) potionEffectMsg += '、';
+      });
+      msg += (potionEffectMsg ? `\n\n**藥水效果:** \n${potionEffectMsg}` : '');
+    }
+
+    // 魔法藥草
+    if (magicHerbCollected) {
+      msg += `\n\n你採集到了 **${magicHerbCollected}** 個 <:magical_herb:1302301265950277673> 魔法藥草!`;
+    }
+
     // 寵物事件
-    if(petReward) {
+    if (petReward) {
       if (petReward.type === 'coin') {
         msg += `\n\n你的寵物 <:${pet.emojiName}:${pet.emojiId}>${pet.name} 幫你撿到了 **${petReward.value}** <:coin:1271510831359852709>!`;
       }

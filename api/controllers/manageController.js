@@ -209,7 +209,6 @@ exports.addPrize = async (req, res) => {
 }
 
 exports.updatePrize = async (req, res) => {
-  console.log(req.body);
   const { id } = req.params;
   const { name, emojiId, emojiName, command, value, petLevelRequirement } = req.body;
 

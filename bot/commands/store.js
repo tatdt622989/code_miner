@@ -52,12 +52,18 @@ module.exports = {
       .setLabel('購買鑰匙')
       .setStyle('Primary');
 
+    const potionButton = new ButtonBuilder()
+      .setCustomId('buy_potion')
+      .setEmoji('1302294741446033448')
+      .setLabel('購買藥劑')
+      .setStyle('Primary');
+
     const returnButton = new ButtonBuilder()
       .setCustomId('profile')
       .setLabel('返回')
       .setStyle('Secondary');
 
-    const actionRow = new ActionRowBuilder().addComponents(toolButton, mineButton, petButton, keyButton);
+    const actionRow = new ActionRowBuilder().addComponents(toolButton, mineButton, petButton, keyButton, potionButton);
 
     const lastMessage = interaction.message;
     if (lastMessage) {

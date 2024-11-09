@@ -5,6 +5,56 @@ const { User, UserPrize } = require('../models/User');
 // utils
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
 const { getRandomInt, getRandomItem, getRandomFloat } = require('../utils/randomUtil');
+const { potionInfo, timeMap } = require('../utils/potionInfo'); // 藥水資訊
+
+function codeGenerator(length) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(getRandomInt(0, characters.length - 1));
+  }
+  return result;
+}
+
+function getMineReward(mine, tool, miningRewardDouble = {}) {
+  const minerals = [];
+  const typeNum = getRandomInt(1, mine.minerals.length); // 隨機取得礦物種類數量
+  let allMinerals = mine.minerals.map(m => m.toObject()); // 轉換為一般陣列
+  let exp = 0;
+  for (let i = 0; i < typeNum; i++) {
+    const selectedMineral = getRandomItem(allMinerals); // 隨機取得礦物
+    const maxDropAmount = tool.effectiveness * selectedMineral.baseMaxDropAmount; // 工具效率 * 礦物最大掉落數量
+    const isDuringPotionEffect = miningRewardDouble.active; // 挖礦獎勵加倍藥水效果
+    const num = getRandomInt(1, maxDropAmount) * (isDuringPotionEffect ? 2 : 1); // 隨機取得掉落數量，若有效果則翻倍
+    exp += selectedMineral.mineral.exp * num; // 獲得經驗
+
+    // 如果礦物已存在，增加1/4機率增加掉落數量
+    const existingMineral = minerals.find(m => m.name === selectedMineral.mineral.name);
+    if (existingMineral) {
+      if (Math.random() < 0.25) {
+        existingMineral.num += Math.floor(num / 2);
+        existingMineral.totalValue += selectedMineral.mineral.value * Math.floor(num / 2);
+        existingMineral.totalExp += selectedMineral.mineral.exp * Math.floor(num / 2);
+        continue;
+      }
+      continue;
+    }
+
+    minerals.push({
+      name: selectedMineral.mineral.name,
+      perValue: selectedMineral.mineral.value,
+      totalValue: selectedMineral.mineral.value * num,
+      num,
+      totalExp: selectedMineral.mineral.exp * num,
+      emojiId: selectedMineral.mineral.emojiId,
+      emojiName: selectedMineral.mineral.emojiName,
+    });
+  }
+
+  const totalValue = minerals.reduce((acc, cur) => acc + cur.totalValue, 0);
+
+  return { minerals, exp, totalValue };
+}
 
 // 挖礦
 exports.mine = async (req, res) => {
@@ -43,47 +93,72 @@ exports.mine = async (req, res) => {
     });
     const tool = await Tool.findById(user.equipped.tool);
 
-    // 檢查等級需求
     const userLevel = getUserLevelAndExperience(user);
-    // if (userLevel.level < mine.levelRequirement) {
-    //   return res.status(400).json({ error: `等級需求：${mine.levelRequirement}，你的等級：${userLevel.level}` });
-    // }
 
-    // 挖礦
-    const minerals = [];
-    const typeNum = getRandomInt(1, mine.minerals.length); // 礦物種類數量
-    let tempMinerals = JSON.parse(JSON.stringify(mine.minerals)); // 深拷貝礦物陣列
-    let exp = 0;
-    for (let i = 0; i < typeNum; i++) {
-      const mineral = getRandomItem(tempMinerals); // 隨機取得礦物
-      const maxDropAmount = tool.effectiveness * mineral.baseMaxDropAmount; // 工具效率 * 礦物最大掉落數量
-      const num = getRandomInt(1, maxDropAmount); // 掉落數量
-      exp += mineral.mineral.exp * num; // 獲得經驗
-
-      // 如果礦物已存在，增加1/4機率增加掉落數量
-      const existingMineral = minerals.find(m => m.name === mineral.mineral.name);
-      if (existingMineral) {
-        if (Math.random() < 0.25) {
-          existingMineral.num += num;
-          existingMineral.totalValue += mineral.mineral.value * num;
-          existingMineral.totalExp += mineral.mineral.exp * num;
-          continue;
-        }
-        continue;
-      }
-      minerals.push({
-        name: mineral.mineral.name,
-        perValue: mineral.mineral.value,
-        totalValue: mineral.mineral.value * num,
-        num,
-        totalExp: mineral.mineral.exp * num,
-        emojiId: mineral.mineral.emojiId,
-        emojiName: mineral.mineral.emojiName,
-      });
+    // 取得魔法藥草
+    let magicHerbCollected = 0;
+    if (getRandomInt(0, 99) < 5) {
+      magicHerbCollected = getRandomInt(1, 3);
+      user.magicalHerb += magicHerbCollected;
     }
-    user.experience += exp;
-    const totalValue = minerals.reduce((acc, cur) => acc + cur.totalValue, 0);
-    user.currency += totalValue;
+
+    // 取得藥水效果
+    const {
+      petTriggerProbabilityDouble = {},
+      miningRewardDouble = {},
+      autoMine = {},
+    } = user.potionEffect.toObject() || {};
+    petTriggerProbabilityDouble.active = petTriggerProbabilityDouble.end > new Date();
+    miningRewardDouble.active = miningRewardDouble.end > new Date();
+
+    // 挖礦事件
+    const mineEvent = getMineReward(mine, tool, miningRewardDouble);
+    user.experience += mineEvent.exp;
+    user.currency += mineEvent.totalValue;
+
+    // 自動挖礦事件
+    let autoMineExp = 0;
+    let autoMineTotalValue = 0;
+    let mergedAutoMineMinerals = [];
+    if (autoMine.active && autoMine.end < new Date()) {
+      const autoMineMinerals = [];
+      const miningInterval = 6 * 1000; // 每6秒挖礦一次
+      const mineDuration = autoMine.durationMinutes * 60 * 1000;
+      const miningTimes = Math.floor(mineDuration / miningInterval);
+      console.log('miningTimes', miningTimes);
+      for (let i = 0; i < miningTimes; i++) {
+        const { minerals, exp, totalValue } = getMineReward(mine, tool);
+        user.experience += exp;
+        user.currency += totalValue;
+        autoMineExp += exp;
+        autoMineMinerals.push(...minerals);
+        autoMineTotalValue += totalValue;
+      }
+      user.potionEffect.autoMine.active = false;
+      console.log('exp', autoMineExp);
+      console.log('totalValue', autoMineTotalValue);
+      // 重複礦物合併
+      const mineralsMap = new Map();
+      autoMineMinerals.forEach(m => {
+        if (mineralsMap.has(m.name)) {
+          const existingMineral = mineralsMap.get(m.name);
+          existingMineral.num += m.num;
+          existingMineral.totalValue += m.totalValue;
+          existingMineral.totalExp += m.totalExp;
+        } else {
+          mineralsMap.set(m.name, {
+            name: m.name,
+            totalValue: m.totalValue,
+            num: m.num,
+            totalExp: m.totalExp,
+            emojiId: m.emojiId,
+            emojiName: m.emojiName,
+          });
+        }
+      });
+      // 轉換為陣列
+      mergedAutoMineMinerals = Array.from(mineralsMap.values());
+    }
 
     // 寵物事件
     let petReward = null;
@@ -91,7 +166,8 @@ exports.mine = async (req, res) => {
     if (user.equipped.pet) {
       pet = await Pet.findById(user.equipped.pet);
       if (pet) {
-        const triggerProbability = pet.triggerProbability;
+        const isDuringPotionEffect = petTriggerProbabilityDouble.active; // 寵物觸發機率加倍藥水效果
+        const triggerProbability = pet.triggerProbability * (isDuringPotionEffect ? 2 : 1);
         const isTrigger = getRandomFloat(0, 99) <= triggerProbability;
         if (isTrigger) {
           const type = getRandomItem([{ name: 'coin', rarity: pet.rewardProbability.coin }, { name: 'code', rarity: pet.rewardProbability.code }]);
@@ -170,19 +246,34 @@ exports.mine = async (req, res) => {
     await user.save();
 
     res.status(200).json({
-      minerals, totalValue,
+      autoMineResult: {
+        minerals: mergedAutoMineMinerals,
+        totalValue: autoMineTotalValue,
+        totalExp: autoMineExp,
+      },
+      mineResult:{
+        minerals: mineEvent.minerals,
+        totalValue: mineEvent.totalValue,
+        totalExp: mineEvent.exp,
+      },
       user: userObj,
-      totalExp: exp,
       tool,
       mine,
-      isLevelUp: level > userObj.prevLevel,
-      levelUpRewards,
       level,
+      levelUpRewards,
+      isLevelUp: level > userObj.prevLevel,
       experience,
       nextLevelExperience,
       isDailyFirstMine: zeroToday > lastMineDate,
+      pet,
       petReward,
-      pet
+      potionInfo,
+      potionEffect: [
+        petTriggerProbabilityDouble,
+        miningRewardDouble,
+        autoMine,
+      ],
+      magicHerbCollected: magicHerbCollected || 0,
     });
   } catch (error) {
     console.log(error);
@@ -310,6 +401,19 @@ exports.listRafflePools = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法取得抽獎池列表' });
+  }
+}
+
+// 藥水列表
+exports.listPotion = async (req, res) => {
+  try {
+    res.status(200).json({
+      potionInfo,
+      timeMap
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得藥水列表' });
   }
 }
 
@@ -512,13 +616,90 @@ exports.buyPet = async (req, res) => {
   }
 }
 
-function codeGenerator(length) {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(getRandomInt(0, characters.length - 1));
+// 購買藥水
+exports.buyPotion = async (req, res) => {
+  const { discordId, type, timeId } = req.body;
+
+  if (!discordId || !type || !timeId || !timeMap[timeId] || !potionInfo[type].price) {
+    return res.status(400).json({ error: '需要用戶ID和藥水類型和時間ID' });
   }
-  return result;
+
+  try {
+    const user = await User.findOne({ discordId })
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    // 取得藥水效果
+    const {
+      petTriggerProbabilityDouble = {},
+      miningRewardDouble = {},
+      autoMine = {},
+    } = user.potionEffect.toObject() || {};
+    petTriggerProbabilityDouble.active = petTriggerProbabilityDouble.end > new Date();
+    miningRewardDouble.active = miningRewardDouble.end > new Date();
+    const potionInfoCopy = JSON.parse(JSON.stringify(potionInfo));
+    potionInfoCopy[1].active = petTriggerProbabilityDouble.active;
+    potionInfoCopy[2].active = miningRewardDouble.active;
+    potionInfoCopy[3].active = autoMine.active;
+
+    // 檢查是否在使用狀態
+    console.log('potionInfoCopy', potionInfoCopy);
+    if (potionInfoCopy[type].active) {
+      return res.status(400).json({ error: '藥水效果仍在使用中' });
+    }
+
+    const potionPrice = potionInfoCopy[type].price * timeId;
+    if (user.magicalHerb < potionPrice) {
+      return res.status(400).json({ error: '魔法草藥不足' });
+    }
+
+    user.magicalHerb -= potionPrice;
+
+    // 檢查是否有藥水效果資料
+    if (!user.potionEffect) {
+      user.potionEffect = {
+        petTriggerProbabilityDouble: {
+          durationMinutes: 0,
+          end: new Date(0),
+        },
+        miningRewardDouble: {
+          durationMinutes: 0,
+          end: new Date(0),
+        },
+        autoMine: {
+          active: false,
+          durationMinutes: 0,
+          end: new Date(0),
+        },
+      }
+    }
+
+    // 藥草效果
+    const now = new Date();
+    switch (type) {
+      case '1':
+        user.potionEffect.petTriggerProbabilityDouble.durationMinutes = timeMap[timeId];
+        user.potionEffect.petTriggerProbabilityDouble.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
+        break;
+      case '2':
+        user.potionEffect.miningRewardDouble.durationMinutes = timeMap[timeId];
+        user.potionEffect.miningRewardDouble.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
+        break;
+      case '3':
+        user.potionEffect.autoMine.active = true;
+        user.potionEffect.autoMine.durationMinutes = timeMap[timeId];
+        user.potionEffect.autoMine.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
+        break;
+    }
+
+    await user.save();
+    res.status(200).json({ message: `成功購買 <:${potionInfoCopy[type].emojiName}:${potionInfoCopy[type].emojiId}> ${potionInfoCopy[type].name}！`, user });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法購買藥水' });
+  }
 }
 
 // 抽寶箱

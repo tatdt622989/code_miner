@@ -75,6 +75,7 @@ module.exports = {
           { _id: '5', emojiId: '1274402290006233088', emojiName: 'key', name: '鑰匙 x 5', price: keyPrice * 5 },
           { _id: '10', emojiId: '1274402290006233088', emojiName: 'key', name: '鑰匙 x 10', price: keyPrice * 10 },
           { _id: '50', emojiId: '1274402290006233088', emojiName: 'key', name: '鑰匙 x 50', price: keyPrice * 50 },
+          { _id: '1000', emojiId: '1274402290006233088', emojiName: 'key', name: '鑰匙 x 1000', price: keyPrice * 1000 },
         ];
         keys.forEach(key => {
           const button = new ButtonBuilder()

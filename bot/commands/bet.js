@@ -64,7 +64,7 @@ module.exports = {
         const res = await axios.post(`${process.env.API_URL}/game/bet`, { discordId, amount, magnification: Number(magnification) });
         let thumbnail = 'https://cdn.discordapp.com/emojis/1276793095974817913.png?v=1';
         if (res.data.isWin) {
-          msg = `恭喜你獲勝了!\n **金幣 + ${amount * Number(magnification)}  <:coin:1271510831359852709>**`;
+          msg = `恭喜你獲勝了!\n **金幣 + ${amount * Number(magnification) - amount}  <:coin:1271510831359852709>**`;
         } else {
           msg = `很遺憾，你輸了!\n  **金幣 - ${amount}  <:coin:1271510831359852709>**`;
           thumbnail = 'https://cdn.discordapp.com/emojis/1276803332115009536.png?v=1';

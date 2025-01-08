@@ -1,6 +1,22 @@
 const mongoose = require('mongoose');
 const { db, reisuiDb } = require('../dbConnections');
 
+// 武器
+const weaponSchema = new mongoose.Schema({
+  weapon: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Weapon',
+  },
+  quality: {
+    type: Number,
+    required: true,
+  },
+  level: {
+    type: Number,
+    required: true,
+  },
+});
+
 // 玩家裝備
 const equippedSchema = new mongoose.Schema({
   tool: {
@@ -15,6 +31,7 @@ const equippedSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Pet',
   },
+  weapon: weaponSchema,
 });
 
 // 藥水效果
@@ -91,6 +108,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  pearl: {
+    type: Number,
+    default: 0,
+  },
+  qualityUpgradeSet: {
+    type: Number,
+    default: 0,
+  },
   tools: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -109,6 +134,7 @@ const userSchema = new mongoose.Schema({
       ref: 'Pet',
     }
   ],
+  weapons: [weaponSchema],
   equipped: {
     type: equippedSchema,
   },

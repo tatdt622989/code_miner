@@ -1,5 +1,5 @@
 // models
-const { Mineral, Tool, Mine, Prize, RafflePool, Code, Pet } = require('../models/Game');
+const { Tool, Mine, Prize, RafflePool, Code, Pet, Weapon, WorldBoss, WorldBossRecord } = require('../models/Game');
 const { User, UserPrize } = require('../models/User');
 
 // utils
@@ -97,7 +97,7 @@ exports.mine = async (req, res) => {
 
     // 取得魔法藥草
     let magicHerbCollected = 0;
-    if (getRandomInt(0, 99) < 5) {
+    if (getRandomInt(0, 99) < 7) {
       magicHerbCollected = getRandomInt(1, 3);
       user.magicalHerb += magicHerbCollected;
     }
@@ -107,7 +107,7 @@ exports.mine = async (req, res) => {
       petTriggerProbabilityDouble = {},
       miningRewardDouble = {},
       autoMine = {},
-    } = user.potionEffect.toObject() || {};
+    } = user.potionEffect && user.potionEffect.toObject() || {};
     petTriggerProbabilityDouble.active = petTriggerProbabilityDouble.end > new Date();
     miningRewardDouble.active = miningRewardDouble.end > new Date();
 
@@ -417,6 +417,39 @@ exports.listPotion = async (req, res) => {
   }
 }
 
+// 武器列表
+exports.listWeapons = async (req, res) => {
+  try {
+    const weapons = await Weapon.find({});
+    res.status(200).json(weapons);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得武器列表' });
+  }
+}
+
+// 世界首領列表
+exports.listWorldBosses = async (req, res) => {
+  try {
+    const bosses = await WorldBoss.find({});
+    res.status(200).json(bosses);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得首領列表' });
+  }
+}
+
+// 出現中的世界首領
+exports.getCurrentWorldBoss = async (req, res) => {
+  try {
+    const currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 }).populate('boss');
+    res.status(200).json(currentBoss);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法取得首領' });
+  }
+}
+
 // 取得特定抽獎池
 exports.getRafflePool = async (req, res) => {
   const { poolId } = req.params;
@@ -635,7 +668,7 @@ exports.buyPotion = async (req, res) => {
       petTriggerProbabilityDouble = {},
       miningRewardDouble = {},
       autoMine = {},
-    } = user.potionEffect.toObject() || {};
+    } = user.potionEffect && user.potionEffect.toObject() || {};
     petTriggerProbabilityDouble.active = petTriggerProbabilityDouble.end > new Date();
     miningRewardDouble.active = miningRewardDouble.end > new Date();
     const potionInfoCopy = JSON.parse(JSON.stringify(potionInfo));
@@ -702,6 +735,63 @@ exports.buyPotion = async (req, res) => {
   }
 }
 
+// 購買武器
+exports.buyWeapon = async (req, res) => {
+  const { discordId, weaponId } = req.body;
+
+  if (!discordId || !weaponId) {
+    return res.status(400).json({ error: '需要用戶ID和武器ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate('weapons')
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const weapons = await Weapon.find({}).sort({ price: -1 });
+    const weapon = weapons.find(w => w.id === weaponId);
+
+    if (!weapon) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+
+    if (user.currency < weapon.price) {
+      return res.status(400).json({ error: '貨幣不足' });
+    }
+
+    const isWeaponOwned = user.weapons.some(w => {
+      const id = w.weapon.toString();
+      return id === weapon.id;
+    });
+    if (isWeaponOwned) {
+      return res.status(400).json({ error: '已擁有此武器' });
+    }
+
+    const cheaperWeapon = weapons.find(w => w.price < weapon.price);
+    if (cheaperWeapon) {
+      const userCheaperWeapon = user.weapons.find(w => w.id === cheaperWeapon.id);
+      if (userCheaperWeapon && userCheaperWeapon.level < 15) {
+        return res.status(400).json({ error: `強化等級不足，請先強化 ${cheaperWeapon.name} 到 +15` });
+      }
+    }
+
+    user.currency -= weapon.price;
+    user.weapons.push({
+      weapon: weapon.id,
+      level: 1,
+      quality: 1,
+    });
+
+    await user.save();
+
+    res.status(200).json({ message: `成功購買 ${weapon.name}！` });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法購買武器' });
+  }
+}
+
 // 抽寶箱
 exports.openChest = async (req, res) => {
   const { discordId, chestId } = req.body;
@@ -743,7 +833,7 @@ exports.openChest = async (req, res) => {
     });
 
     // 如果是金幣，增加金幣
-    if (prize.prize.value) {
+    if (prize.prize.value && prize.prize.type === 'coin') {
       user.currency += prize.prize.value;
       newUserPrize.value = prize.prize.value;
     }

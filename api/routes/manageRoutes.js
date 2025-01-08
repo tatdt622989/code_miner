@@ -14,7 +14,11 @@ const {
   addPrize,
   updatePrize,
   addRafflePool,
-  addRafflePoolPrize
+  addRafflePoolPrize,
+  addWeapon,
+  updateWeapon,
+  addWorldBoss,
+  updateWorldBoss
 } = require('../controllers/manageController');
 
 // 新增礦物
@@ -52,5 +56,17 @@ router.post('/rafflePool', addRafflePool);
 
 // 新增抽獎池的獎品
 router.post('/rafflePool/prize', addRafflePoolPrize);
+
+// 新增武器
+router.post('/weapon', addWeapon);
+
+// 更新武器
+router.put('/weapon/:id', updateWeapon);
+
+// 新增世界首領
+router.post('/worldBoss', addWorldBoss);
+
+// 更新世界首領
+router.put('/worldBoss/:id', updateWorldBoss);
 
 module.exports = router;

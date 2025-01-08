@@ -1,5 +1,5 @@
 /// models
-const { Mineral, Tool, Mine, Prize, RafflePool, Pet } = require('../models/Game');
+const { Mineral, Tool, Mine, Prize, RafflePool, Pet, Weapon, WorldBoss } = require('../models/Game');
 
 // 判斷是否為數字
 function isNumeric(value) {
@@ -190,7 +190,7 @@ exports.updatePet = async (req, res) => {
 }
 
 exports.addPrize = async (req, res) => {
-  const { name, emojiId, emojiName, command, value, petLevelRequirement } = req.body;
+  const { name, emojiId, emojiName, command, value, petLevelRequirement, type, weight } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: '需要獎品名稱' });
@@ -200,8 +200,16 @@ exports.addPrize = async (req, res) => {
     return res.status(400).json({ error: '需要代碼或指令和值' });
   }
 
+  if (type && type !== 'coin' && type !== 'code' && type !== 'pearl' && type !== 'qualityUpgradeSet') {
+    return res.status(400).json({ error: '獎品類型只能是coin、code、pearl或qualityUpgradeSet' });
+  }
+
+  if (weight && !isNumeric(weight) || weight < 0) {
+    return res.status(400).json({ error: '權重需要是數字且大於等於0' });
+  }
+
   try {
-    const newPrize = await Prize.create({ name, command, value, emojiId, emojiName, petLevelRequirement: petLevelRequirement || 1 });
+    const newPrize = await Prize.create({ name, command, value, emojiId, emojiName, petLevelRequirement: petLevelRequirement || 1, type, weight });
     res.status(201).json(newPrize);
   } catch (error) {
     res.status(500).json({ error: '無法新增獎品' });
@@ -210,7 +218,7 @@ exports.addPrize = async (req, res) => {
 
 exports.updatePrize = async (req, res) => {
   const { id } = req.params;
-  const { name, emojiId, emojiName, command, value, petLevelRequirement } = req.body;
+  const { name, emojiId, emojiName, command, value, petLevelRequirement, type, weight } = req.body;
 
   // 只更新有提供的欄位
   const updateObj = {};
@@ -220,6 +228,8 @@ exports.updatePrize = async (req, res) => {
   if (command) updateObj.command = command;
   if (value) updateObj.value = value;
   if (petLevelRequirement) updateObj.petLevelRequirement = petLevelRequirement;
+  if (type) updateObj.type = type;
+  if (weight) updateObj.weight = weight;
 
   if (Object.keys(updateObj).length === 0) {
     return res.status(400).json({ error: '需要更新的欄位' });
@@ -263,5 +273,100 @@ exports.addRafflePoolPrize = async (req, res) => {
     res.status(201).json(rafflePool);
   } catch (error) {
     res.status(500).json({ error: '無法新增抽獎池的獎品' });
+  }
+}
+
+exports.addWeapon = async (req, res) => {
+  const { name, emojiId, emojiName, basicAttack, price, basicDefense } = req.body;
+
+  if (!name || !emojiId || !emojiName || !basicAttack || !isNumeric(price) || !basicDefense) {
+    return res.status(400).json({ error: '需要武器名稱、表情符號ID和名稱、基礎攻擊、價格、基礎防禦' });
+  }
+
+  try {
+    const newWeapon = await Weapon.create(req.body);
+    res.status(201).json(newWeapon);
+  } catch (error) {
+    res.status(500).json({ error: '無法新增武器' });
+  }
+}
+
+exports.updateWeapon = async (req, res) => {
+  const { id } = req.params;
+  const { name, emojiId, emojiName, basicAttack, price, level, quality } = req.body;
+
+  // 只更新有提供的欄位
+  const updateObj = {};
+  if (name) updateObj.name = name;
+  if (emojiId) updateObj.emojiId = emojiId;
+  if (emojiName) updateObj.emojiName = emojiName;
+  if (basicAttack) {
+    if (basicAttack.min) {
+      updateObj.basicAttack.min = basicAttack.min;
+    }
+    if (basicAttack.max) {
+      updateObj.basicAttack.max = basicAttack.max;
+    }
+  }
+  if (price) updateObj.price = price;
+  if (level) updateObj.level = level;
+  if (quality) updateObj.quality = quality;
+
+  if (Object.keys(updateObj).length === 0) {
+    return res.status(400).json({ error: '需要更新的欄位' });
+  }
+
+  try {
+    const weapon = await Weapon.findByIdAndUpdate(id, updateObj, { new: true });
+    res.status(200).json(weapon);
+  } catch (error) {
+    res.status(500).json({ error: '無法更新武器' });
+  }
+}
+
+exports.addWorldBoss = async (req, res) => {
+  const { name, emojiId, emojiName, hp, basicAttack, difficulty } = req.body;
+
+  if (!name || !emojiId || !emojiName || !hp || !basicAttack || !difficulty) {
+    return res.status(400).json({ error: '需要世界首領名稱、表情符號ID和名稱、HP、基礎攻擊、難度' });
+  }
+
+  try {
+    const newWorldBoss = await WorldBoss.create(req.body);
+    res.status(201).json(newWorldBoss);
+  } catch (error) {
+    res.status(500).json({ error: '無法新增世界首領' });
+  }
+}
+
+exports.updateWorldBoss = async (req, res) => {
+  const { id } = req.params;
+  const { name, emojiId, emojiName, baseHp, basicAttack, difficulty } = req.body;
+
+  // 只更新有提供的欄位
+  const updateObj = {};
+  if (name) updateObj.name = name;
+  if (emojiId) updateObj.emojiId = emojiId;
+  if (emojiName) updateObj.emojiName = emojiName;
+  if (baseHp) updateObj.baseHp = baseHp;
+  if (basicAttack) {
+    if (basicAttack.min) {
+      updateObj.basicAttack.min = basicAttack.min;
+    }
+    if (basicAttack.max) {
+      updateObj.basicAttack.max = basicAttack.max;
+    }
+  }
+  if (difficulty) updateObj.difficulty = difficulty;
+
+  if (Object.keys(updateObj).length === 0) {
+    return res.status(400).json({ error: '需要更新的欄位' });
+  }
+
+  try {
+    const worldBoss = await WorldBoss.findByIdAndUpdate(id, updateObj, { new: true });
+    res.status(200).json(worldBoss);
+  } catch (error) {
+    res.status(500).json({ error: '無法更新世界首領' });
   }
 }

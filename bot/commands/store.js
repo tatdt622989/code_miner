@@ -55,7 +55,7 @@ module.exports = {
     const potionButton = new ButtonBuilder()
       .setCustomId('buy_potion')
       .setEmoji('1302294741446033448')
-      .setLabel('購買藥劑')
+      .setLabel('購買藥水')
       .setStyle('Primary');
 
     const returnButton = new ButtonBuilder()

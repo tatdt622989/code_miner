@@ -97,6 +97,10 @@ const toolSchema = new mongoose.Schema({
 
 // 獎品
 const prizeSchema = new mongoose.Schema({
+	type: {
+		type: String,
+		required: true,
+	},
 	name: {
 		type: String,
 		required: true,
@@ -116,7 +120,12 @@ const prizeSchema = new mongoose.Schema({
 	petLevelRequirement: {
 		type: Number,
 		default: 1,
-	}
+	},
+	weight: {
+		type: Number,
+		required: true,
+		default: 10000,
+	},
 });
 
 // 抽獎池獎品資訊
@@ -208,6 +217,86 @@ const petSchema = new mongoose.Schema({
 	},
 });
 
+// 基礎攻擊
+const rangeSchema = new mongoose.Schema({
+	min: {
+		type: Number,
+		required: true,
+	},
+	max: {
+		type: Number,
+		required: true,
+	},
+});
+
+// 武器
+const weaponSchema = new mongoose.Schema({
+	name: {
+		type: String,
+		required: true,
+	},
+	price: {
+		type: Number,
+		required: true,
+	},
+	emojiId: {
+		type: String,
+		required: true,
+	},
+	emojiName: {
+		type: String,
+		required: true,
+	},
+	basicAttack: rangeSchema,
+	basicDefense: rangeSchema,
+});
+
+// 世界BOSS
+const worldBossSchema = new mongoose.Schema({
+	name: {
+		type: String,
+		required: true,
+	},
+	emojiId: {
+		type: String,
+		required: true,
+	},
+	emojiName: {
+		type: String,
+		required: true,
+	},
+	baseHp: {
+		type: Number,
+		required: true,
+	},
+	basicAttack: rangeSchema,
+	difficulty: {
+		type: Number,
+		required: true,
+	},
+});
+
+// 世界BOSS出現紀錄
+const worldBossRecordSchema = new mongoose.Schema({
+	worldBoss: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: 'WorldBoss',
+	},
+	hp: {
+		type: Number,
+		required: true,
+	},
+	remainingHp: {
+		type: Number,
+		required: true,
+	},
+	quality: {
+		type: Number,
+		required: true,
+		default: 1,
+	},
+}, { timestamps: true });
+
 // minecraft序號
 const coedSchema = new mongoose.Schema({
 	code: {
@@ -236,5 +325,8 @@ const Prize = db.model('Prize', prizeSchema);
 const RafflePool = db.model('RafflePool', rafflePoolSchema);
 const Code = reisuiDb.model('Code', coedSchema);
 const Pet = db.model('Pet', petSchema);
+const Weapon = db.model('Weapon', weaponSchema);
+const WorldBoss = db.model('WorldBoss', worldBossSchema);
+const WorldBossRecord = db.model('WorldBossRecord', worldBossRecordSchema);
 
-module.exports = { Mine, Mineral, Tool, Prize, RafflePool, Code, Pet };
+module.exports = { Mine, Mineral, Tool, Prize, RafflePool, Code, Pet, Weapon, WorldBoss, WorldBossRecord };

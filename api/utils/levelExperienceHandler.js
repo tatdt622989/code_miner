@@ -1,5 +1,5 @@
 const baseValue = 100; // 可調整的基礎值
-const growthFactor = 1.4; // 可調整的增長因子
+const growthFactor = 1.5; // 可調整的增長因子
 const maxLevel = 300; // 最大等級
 
 // 打印等級經驗表

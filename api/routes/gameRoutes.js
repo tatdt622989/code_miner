@@ -11,11 +11,15 @@ const {
   listPets,
   listRafflePools,
   listPotion,
+  listWeapons,
+  listWorldBosses,
+  getCurrentWorldBoss,
   buyMine,
   buyTool,
   buyKey,
   buyPet,
   buyPotion,
+  buyWeapon,
   getRafflePool,
   openChest,
   bet
@@ -48,6 +52,15 @@ router.get('/pet/:petId', listPet);
 // 取得所有藥水資訊
 router.get('/potions', listPotion);
 
+// 武器列表
+router.get('/weapons', listWeapons);
+
+// 世界首領列表
+router.get('/worldBosses', listWorldBosses);
+
+// 取得目前世界首領
+router.get('/worldBoss', getCurrentWorldBoss);
+
 // 購買礦場
 router.post('/buyMine', buyMine);
 
@@ -62,6 +75,9 @@ router.post('/buyPet', buyPet);
 
 // 購買藥水
 router.post('/buyPotion', buyPotion);
+
+// 購買武器
+router.post('/buyWeapon', buyWeapon);
 
 // 開啟寶箱
 router.post('/lottery/open', openChest);

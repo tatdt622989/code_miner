@@ -8,6 +8,17 @@
 
 ```
 code-miner
-├── api
-├── bot
+├── api 後端API
+│   ├─ models 資料表Model
+│   ├─ routes 路由
+│   ├─ controllers 路由邏輯
+│   ├─ utils 通用函式
+│   ├─ app.js 進入點
+│   └─ .env 環境變數
+├── bot Discord 機器人
+│   ├─ commands DC斜線指令
+│   ├─ utils 通用函式
+│   ├─ app.js 進入點
+│   └─ .env 環境變數
+└── .nvmrc Node.js指令版本
 ```

@@ -1,6 +1,17 @@
 const mongoose = require('mongoose');
 const { db, reisuiDb } = require('../dbConnections');
 
+const rangeSchema = new mongoose.Schema({
+	min: {
+		type: Number,
+		required: true,
+	},
+	max: {
+		type: Number,
+		required: true,
+	},
+});
+
 // 武器
 const weaponSchema = new mongoose.Schema({
   weapon: {
@@ -13,6 +24,10 @@ const weaponSchema = new mongoose.Schema({
   },
   level: {
     type: Number,
+    required: true,
+  },
+  attack: {
+    type: rangeSchema,
     required: true,
   },
 });
@@ -31,7 +46,10 @@ const equippedSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Pet',
   },
-  weapon: weaponSchema,
+  weapon: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Weapon',
+  }
 });
 
 // 藥水效果

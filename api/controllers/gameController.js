@@ -5,6 +5,7 @@ const { User, UserPrize } = require('../models/User');
 // utils
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
 const { getRandomInt, getRandomItem, getRandomFloat } = require('../utils/randomUtil');
+const { getStrengthenData, getQualityData, getWeaponAttack, getQualityName } = require('../utils/weaponUtil');
 const { potionInfo, timeMap } = require('../utils/potionInfo'); // 藥水資訊
 
 function codeGenerator(length) {
@@ -779,8 +780,12 @@ exports.buyWeapon = async (req, res) => {
     user.currency -= weapon.price;
     user.weapons.push({
       weapon: weapon.id,
-      level: 1,
+      level: 0,
       quality: 1,
+      attack: {
+        min: weapon.basicAttack.min,
+        max: weapon.basicAttack.max
+      }
     });
 
     await user.save();
@@ -789,6 +794,157 @@ exports.buyWeapon = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法購買武器' });
+  }
+}
+
+// 裝備武器
+exports.equipWeapon = async (req, res) => {
+  const { discordId, weaponId } = req.body;
+
+  if (!discordId || !weaponId) {
+    return res.status(400).json({ error: '需要用戶ID和武器ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate('weapons')
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const weapon = await Weapon.findById(weaponId);
+    if (!weapon) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+
+    const isWeaponOwned = user.weapons.some(w => {
+      const id = w.weapon.toString();
+      return id === weapon.id;
+    });
+    if (!isWeaponOwned) {
+      return res.status(400).json({ error: '未擁有此武器' });
+    }
+
+    user.equipped.weapon = weapon._id;
+    await user.save();
+
+    res.status(200).json({ message: `成功裝備 ${weapon.name}！` });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法裝備武器' });
+  }
+}
+
+// 強化武器
+exports.strengthenWeapon = async (req, res) => {
+  const { discordId, userWeaponId } = req.body;
+
+  if (!discordId || !userWeaponId) {
+    return res.status(400).json({ error: '需要用戶ID和武器ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate({
+      path: 'weapons',
+      populate: {
+        path: 'weapon',
+        model: 'Weapon',
+      }
+    })
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    console.log('user', user.name, user.discordId);
+
+    const userWeapon = user.weapons.find(w => w.id === userWeaponId);
+    if (!userWeapon) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+
+    const nextLevel = userWeapon.level + 1;
+    const strengthenData = getStrengthenData(nextLevel);
+    if (!strengthenData) {
+      return res.status(400).json({ error: '已到達最高強化等級' });
+    }
+
+    if (!user.pearl || user.pearl < strengthenData.pearl) {
+      return res.status(400).json({ error: '強化寶珠不足' });
+    }
+
+    user.pearl -= strengthenData.pearl;
+
+    const isSuccess = getRandomInt(0, 999) < strengthenData.probability * 1000;
+    if (isSuccess) {
+      userWeapon.level = nextLevel;
+      ['min', 'max'].forEach(attr => {
+        userWeapon.attack[attr] = (userWeapon.attack[attr] * strengthenData.increase).toFixed(2);
+      });
+      await user.save();
+      console.log('強化成功', userWeapon.weapon.name, userWeapon.level);
+      res.status(200).json({ message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max}` });
+    } else {
+      console.log('強化失敗', userWeapon.weapon.name, userWeapon.level);
+      res.status(200).json({ message: `強化失敗！` });
+    }
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法強化武器' });
+  }
+}
+
+// 提升武器品質
+exports.upgradeWeaponQuality = async (req, res) => {
+  const { discordId, userWeaponId } = req.body;
+
+  if (!discordId || !userWeaponId) {
+    return res.status(400).json({ error: '需要用戶ID和武器ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate({
+      path: 'weapons',
+      populate: {
+        path: 'weapon',
+        model: 'Weapon',
+      }
+    })
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const userWeapon = user.weapons.find(w => w.id === userWeaponId);
+    if (!userWeapon) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+
+    const nextQuality = userWeapon.quality + 1;
+    const qualityData = getQualityData(nextQuality);
+    if (!qualityData) {
+      return res.status(400).json({ error: '已到達最高品質' });
+    }
+
+    if (!user.qualityUpgradeSet || user.qualityUpgradeSet < qualityData.qualityUpgradeSet) {
+      return res.status(400).json({ error: '提升品質所需升級套裝不足' });
+    }
+
+    user.qualityUpgradeSet -= qualityData.qualityUpgradeSet;
+
+    const isSuccess = getRandomInt(0, 999) < qualityData.probability * 1000;
+    if (isSuccess) {
+      userWeapon.quality = nextQuality;
+      const attack = await getWeaponAttack(userWeapon.weapon.id, userWeapon.quality, userWeapon.level)
+      userWeapon.attack = attack;
+      await user.save();
+      console.log('提升品質成功', userWeapon.weapon.name, userWeapon.quality);
+      res.status(200).json({ message: `成功提升 ${userWeapon.weapon.name} 到 **${getQualityName(userWeapon.quality)}** 品質！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max}` });
+    } else {
+      console.log('提升品質失敗', userWeapon.weapon.name, userWeapon.quality);
+      res.status(200).json({ message: `提升品質失敗！` });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法提升武器品質' });
   }
 }
 

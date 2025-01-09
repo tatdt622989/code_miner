@@ -22,7 +22,10 @@ const {
   buyWeapon,
   getRafflePool,
   openChest,
-  bet
+  bet,
+  equipWeapon,
+  strengthenWeapon,
+  upgradeWeaponQuality
 } = require('../controllers/gameController');
 
 // 挖礦
@@ -78,6 +81,15 @@ router.post('/buyPotion', buyPotion);
 
 // 購買武器
 router.post('/buyWeapon', buyWeapon);
+
+// 裝備武器
+router.post('/equipWeapon', equipWeapon);
+
+// 強化武器
+router.post('/strengthenWeapon', strengthenWeapon);
+
+// 提升武器品質
+router.post('/upgradeWeaponQuality', upgradeWeaponQuality);
 
 // 開啟寶箱
 router.post('/lottery/open', openChest);

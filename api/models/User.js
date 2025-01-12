@@ -30,6 +30,10 @@ const weaponSchema = new mongoose.Schema({
     type: rangeSchema,
     required: true,
   },
+  defense: {
+    type: rangeSchema,
+    required: true,
+  },
 });
 
 // 玩家裝備
@@ -163,6 +167,14 @@ const userSchema = new mongoose.Schema({
   potionEffect: {
     type: potionEffectSchema,
   },
+  hp: {
+    type: Number,
+    default: 100,
+  },
+  lastAttackWorldBoss: {
+    type: Date,
+    default: new Date(0),
+  }
 }, { timestamps: true });
 
 // 獎品紀錄

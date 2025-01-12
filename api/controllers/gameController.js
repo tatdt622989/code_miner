@@ -5,7 +5,7 @@ const { User, UserPrize } = require('../models/User');
 // utils
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
 const { getRandomInt, getRandomItem, getRandomFloat } = require('../utils/randomUtil');
-const { getStrengthenData, getQualityData, getWeaponAttack, getQualityName } = require('../utils/weaponUtil');
+const { getStrengthenData, getQualityData, getWeaponData, getQualityName } = require('../utils/weaponUtil');
 const { potionInfo, timeMap } = require('../utils/potionInfo'); // 藥水資訊
 
 function codeGenerator(length) {
@@ -231,6 +231,7 @@ exports.mine = async (req, res) => {
     const { level, levelUpRewards, nextLevelExperience, experience } = getUserLevelAndExperience(user);
     if (level > userObj.prevLevel) {
       user.currency += levelUpRewards
+      user.hp = level * 10;
     }
     userObj.level = level;
 
@@ -252,7 +253,7 @@ exports.mine = async (req, res) => {
         totalValue: autoMineTotalValue,
         totalExp: autoMineExp,
       },
-      mineResult:{
+      mineResult: {
         minerals: mineEvent.minerals,
         totalValue: mineEvent.totalValue,
         totalExp: mineEvent.exp,
@@ -421,8 +422,29 @@ exports.listPotion = async (req, res) => {
 // 武器列表
 exports.listWeapons = async (req, res) => {
   try {
+    const { discordId } = req.params;
+    if (!discordId) {
+      return res.status(400).json({ error: '需要用戶ID' });
+    }
     const weapons = await Weapon.find({});
-    res.status(200).json(weapons);
+    // 玩家已擁有的武器
+    const user = await User.findOne({ discordId }).populate('weapons').sort({ price: 1 });
+    let isNextWeaponAvailable = true;
+    const weaponsWithUser = weapons.map(weapon => {
+      const userWeapon = user.weapons.find(w => w.weapon.toString() === weapon.id);
+      const isAvailable = isNextWeaponAvailable;
+      if (userWeapon && userWeapon.level <= 15 || !userWeapon) {
+        isNextWeaponAvailable = false;
+      }
+      console.log(userWeapon);
+      return {
+        ...weapon._doc,
+        owned: !!userWeapon,
+        isAvailable,
+        qualityName: userWeapon && getQualityName(userWeapon.quality) || '未知',
+      }
+    });
+    res.status(200).json(weaponsWithUser);
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法取得武器列表' });
@@ -443,7 +465,7 @@ exports.listWorldBosses = async (req, res) => {
 // 出現中的世界首領
 exports.getCurrentWorldBoss = async (req, res) => {
   try {
-    const currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 }).populate('boss');
+    const currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 });
     res.status(200).json(currentBoss);
   } catch (error) {
     console.log(error);
@@ -785,6 +807,10 @@ exports.buyWeapon = async (req, res) => {
       attack: {
         min: weapon.basicAttack.min,
         max: weapon.basicAttack.max
+      },
+      defense: {
+        min: weapon.basicDefense.min,
+        max: weapon.basicDefense.max
       }
     });
 
@@ -854,8 +880,6 @@ exports.strengthenWeapon = async (req, res) => {
       return res.status(404).json({ error: '找不到使用者' });
     }
 
-    console.log('user', user.name, user.discordId);
-
     const userWeapon = user.weapons.find(w => w.id === userWeaponId);
     if (!userWeapon) {
       return res.status(404).json({ error: '找不到武器' });
@@ -878,10 +902,11 @@ exports.strengthenWeapon = async (req, res) => {
       userWeapon.level = nextLevel;
       ['min', 'max'].forEach(attr => {
         userWeapon.attack[attr] = (userWeapon.attack[attr] * strengthenData.increase).toFixed(2);
+        userWeapon.defense[attr] = (userWeapon.defense[attr] * strengthenData.increase).toFixed(2);
       });
       await user.save();
       console.log('強化成功', userWeapon.weapon.name, userWeapon.level);
-      res.status(200).json({ message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max}` });
+      res.status(200).json({ message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}` });
     } else {
       console.log('強化失敗', userWeapon.weapon.name, userWeapon.level);
       res.status(200).json({ message: `強化失敗！` });
@@ -933,11 +958,12 @@ exports.upgradeWeaponQuality = async (req, res) => {
     const isSuccess = getRandomInt(0, 999) < qualityData.probability * 1000;
     if (isSuccess) {
       userWeapon.quality = nextQuality;
-      const attack = await getWeaponAttack(userWeapon.weapon.id, userWeapon.quality, userWeapon.level)
+      const { attack, defense } = await getWeaponData(userWeapon.weapon.id, userWeapon.quality, userWeapon.level)
       userWeapon.attack = attack;
+      userWeapon.defense = defense;
       await user.save();
       console.log('提升品質成功', userWeapon.weapon.name, userWeapon.quality);
-      res.status(200).json({ message: `成功提升 ${userWeapon.weapon.name} 到 **${getQualityName(userWeapon.quality)}** 品質！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max}` });
+      res.status(200).json({ message: `成功提升 ${userWeapon.weapon.name} 到 **${getQualityName(userWeapon.quality)}** 品質！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}` });
     } else {
       console.log('提升品質失敗', userWeapon.weapon.name, userWeapon.quality);
       res.status(200).json({ message: `提升品質失敗！` });
@@ -1065,5 +1091,321 @@ exports.bet = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法賭博' });
+  }
+}
+
+// 攻擊世界首領
+exports.attackBoss = async (req, res) => {
+  const { discordId } = req.body;
+
+  if (!discordId) {
+    return res.status(400).json({ error: '需要用戶ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate({
+      path: 'weapons',
+      populate: {
+        path: 'weapon',
+        model: 'Weapon',
+      }
+    });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const nowTs = Date.now();
+
+    // 是否回補 HP，每半小時回補一次
+    const resetTime = user.lastAttackWorldBoss.getTime() + 30 * 60 * 1000;
+    if (nowTs > resetTime) {
+      const { level } = getUserLevelAndExperience(user);
+      user.hp = level > 1 ? level * 10 + 100 : 100;
+    }
+
+    // 檢查 HP 是否大於 0
+    if (user.hp <= 0) {
+      return res.status(400).json({ error: `你太累了，休息一下吧！ \n (${Math.ceil((resetTime - nowTs) / 1000)}秒後可再次攻擊)` });
+    }
+
+    // 獲取世界首領
+    let currentBoss = await WorldBossRecord.findOne({}).populate('worldBoss').sort({ createdAt: -1 });
+    // 檢查世界首領是否過期
+    let isExpired = false;
+    if (currentBoss && currentBoss.remainingHp >= 0) {
+      const timeLimit = currentBoss.quality * 24 * 60 * 60 * 1000;
+      if (nowTs > currentBoss.createdAt + timeLimit) {
+        isExpired = true;
+      }
+    }
+    // 沒有世界首領或過期的話，生成新的世界首領
+    if (!currentBoss || currentBoss.remainingHp <= 0 || isExpired) {
+      const allWorldBosses = await WorldBoss.find({}).sort({ level: -1 });
+      const randomBoss = allWorldBosses[getRandomInt(0, allWorldBosses.length - 1)];
+      const quality = getRandomInt(1, 6);
+      const hpTimes = [1, 5, 15, 30, 100, 300][quality - 1];
+      const attackTimes = [1, 3, 5, 7, 9, 15][quality - 1];
+      const newBoss = new WorldBossRecord({
+        worldBoss: randomBoss.id,
+        hp: randomBoss.baseHp * hpTimes,
+        remainingHp: randomBoss.baseHp * hpTimes,
+        attack: {
+          min: randomBoss.basicAttack.min * attackTimes,
+          max: randomBoss.basicAttack.max * attackTimes,
+        },
+        quality,
+      });
+      await newBoss.save();
+      currentBoss = await WorldBossRecord.findOne({}).populate('worldBoss').sort({ createdAt: -1 });
+    }
+
+    // 玩家攻擊
+    const userWeapon = user.weapons.find(w => w.weapon.id === user.equipped.weapon.toString());
+    if (!userWeapon) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+    const userAttack = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max);
+    let isLastAttack = false;
+    currentBoss.remainingHp = (currentBoss.remainingHp - userAttack).toFixed(2);
+    if (currentBoss.remainingHp <= 0) {
+      currentBoss.remainingHp = 0;
+      isLastAttack = true;
+    }
+    user.lastAttackWorldBoss = nowTs;
+
+    // 世界首領攻擊
+    const userDefense = getRandomFloat(userWeapon.defense.min, userWeapon.defense.max);
+    const bossAttack = Math.max(0, (getRandomFloat(currentBoss.attack.min, currentBoss.attack.max) - userDefense).toFixed(2));
+    if (bossAttack > user.hp) {
+      user.hp = 0;
+    } else {
+      user.hp = (user.hp - bossAttack).toFixed(2);
+    }
+
+    // 紀錄玩家戰鬥紀錄
+    let userRecord = currentBoss.participatingUsers.find(p => p.user.toString() === user.id);
+    if (userRecord) {
+      userRecord.userDamage = (userRecord.userDamage + userAttack).toFixed(2);
+      if (isLastAttack) {
+        userRecord.isFinalHit = true;
+      }
+    } else {
+      const newRecord = {
+        userDamage: userAttack,
+        user: user.id,
+        isFinalHit: isLastAttack,
+      }
+      currentBoss.participatingUsers.push(newRecord);
+    }
+
+    await currentBoss.save();
+    await user.save();
+
+    res.status(200).json({ currentBoss, user });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法攻擊世界首領' });
+  }
+}
+
+// 檢查是否有未領取的世界首領獎勵
+exports.checkWorldBossReward = async (req, res) => {
+  const { discordId } = req.body;
+
+  if (!discordId) {
+    return res.status(400).json({ error: '需要用戶ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const worldBoss = await WorldBossRecord.findOne({
+      'participatingUsers.user': user.id,
+      remainingHp: { $lte: 0 },
+    }).populate('worldBoss').sort({ createdAt: -1 });
+    if (!worldBoss) {
+      return res.status(404).json({ error: '找不到世界首領' });
+    }
+
+    const userRecord = worldBoss.participatingUsers.find(p => p.user.toString() === user.id);
+    if (!userRecord) {
+      return res.status(404).json({ error: '找不到使用者戰鬥紀錄' });
+    }
+
+    if (userRecord.isClaimed) {
+      return res.status(200).json({ hasReward: false });
+    }
+
+    return res.status(200).json({ hasReward: true });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法檢查世界首領獎勵' });
+  }
+}
+
+// 領取世界首領獎勵
+exports.claimWorldBossReward = async (req, res) => {
+  const { discordId } = req.body;
+
+  if (!discordId) {
+    return res.status(400).json({ error: '需要用戶ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId });
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const worldBoss = await WorldBossRecord.findOne({
+      'participatingUsers.user': user.id,
+      remainingHp: { $gt: 0 },
+    }).populate('worldBoss').sort({ createdAt: -1 });
+    if (!worldBoss) {
+      return res.status(404).json({ error: '找不到世界首領' });
+    }
+
+    const userRecord = worldBoss.participatingUsers.find(p => p.user.toString() === user.id);
+    if (!userRecord) {
+      return res.status(404).json({ error: '找不到使用者戰鬥紀錄' });
+    }
+
+    if (userRecord.isClaimed) {
+      return res.status(200).json({ error: '已領取過獎勵' });
+    }
+
+    let itemNum = getRandomInt(1, worldBoss.quality + worldBoss.worldBoss.difficulty);
+    if (userRecord.isFinalHit) {
+      itemNum += 1;
+    }
+    const allPrizes = await Prize.find({}).sort({ weight: 1 });
+    const pearlNum = {
+      min: 0,
+      max: 0,
+    }
+    const qualityUpgradeSetNum = {
+      min: 0,
+      max: 0,
+    }
+    const prizeNum = {
+      normal: 140, // weight > 5000
+      rare: 9, // weight > 1 and weight <= 5000
+      legendary: 1, // weight = 1
+    };
+    const extraWeightBonus = {
+      rare: 0,
+      legendary: 0,
+    }
+    switch (worldBoss.quality) {
+      case 1:
+        pearlNum.max = 2 + worldBoss.worldBoss.difficulty;
+        qualityUpgradeSetNum.max = Math.ceil(worldBoss.worldBoss.difficulty / 2);
+        prizeNum.normal -= worldBoss.worldBoss.difficulty;
+        extraWeightBonus.rare = 50 * worldBoss.worldBoss.difficulty;
+        extraWeightBonus.legendary = 10 * worldBoss.worldBoss.difficulty;
+        break;
+      case 2:
+        pearlNum.min = 1;
+        pearlNum.max = 4 + worldBoss.worldBoss.difficulty;
+        qualityUpgradeSetNum.max = worldBoss.worldBoss.difficulty;
+        prizeNum.normal = 120;
+        prizeNum.normal -= worldBoss.worldBoss.difficulty * 2;
+        prizeNum.legendary = 2;
+        extraWeightBonus.rare = 100 * worldBoss.worldBoss.difficulty;
+        extraWeightBonus.legendary = 50 * worldBoss.worldBoss.difficulty;
+        break;
+      case 3:
+        pearlNum.min = 2;
+        pearlNum.max = 6 + worldBoss.worldBoss.difficulty * 2;
+        qualityUpgradeSetNum.max = worldBoss.worldBoss.difficulty * 2;
+        prizeNum.normal = 100;
+        prizeNum.normal -= worldBoss.worldBoss.difficulty * 3;
+        prizeNum.legendary = 3;
+        extraWeightBonus.rare = 250 * worldBoss.worldBoss.difficulty;
+        extraWeightBonus.legendary = 100 * worldBoss.worldBoss.difficulty;
+        break;
+      case 4:
+        pearlNum.min = 3;
+        pearlNum.max = 8 + worldBoss.worldBoss.difficulty * 3;
+        qualityUpgradeSetNum.max = worldBoss.worldBoss.difficulty * 3;
+        prizeNum.normal = 80;
+        prizeNum.normal -= worldBoss.worldBoss.difficulty * 4;
+        prizeNum.rare = 10;
+        prizeNum.legendary = 4;
+        extraWeightBonus.rare = 500 * worldBoss.worldBoss.difficulty;
+        extraWeightBonus.legendary = 200 * worldBoss.worldBoss.difficulty;
+        break;
+      case 5:
+        pearlNum.min = 4;
+        pearlNum.max = 10 + worldBoss.worldBoss.difficulty * 4;
+        qualityUpgradeSetNum.max = worldBoss.worldBoss.difficulty * 4;
+        prizeNum.normal = 60;
+        prizeNum.normal -= worldBoss.worldBoss.difficulty * 5;
+        prizeNum.rare = 10;
+        prizeNum.legendary = 5;
+        extraWeightBonus.rare = 10000;
+        extraWeightBonus.legendary = 1000 * worldBoss.worldBoss.difficulty;
+        break;
+      case 6:
+        pearlNum.min = 5;
+        pearlNum.max = 12 + worldBoss.worldBoss.difficulty * 5;
+        qualityUpgradeSetNum.max = worldBoss.worldBoss.difficulty * 5;
+        prizeNum.normal = 40;
+        prizeNum.normal -= worldBoss.worldBoss.difficulty * 6;
+        prizeNum.rare = 10;
+        prizeNum.legendary = 6;
+        extraWeightBonus.rare = 10000;
+        extraWeightBonus.legendary = 2500 * worldBoss.worldBoss.difficulty;
+        break;
+      default:
+        break;
+    }
+    // 產生獎池
+    const normalPrizes = allPrizes.filter(p => p.weight > 5000).slice(0, prizeNum.normal);
+    const rarePrizes = allPrizes.filter(p => p.weight > 1 && p.weight <= 5000).slice(0, prizeNum.rare);
+    const legendaryPrizes = allPrizes.filter(p => p.weight === 1).slice(0, prizeNum.legendary);
+    const prizes = [...normalPrizes, ...rarePrizes, ...legendaryPrizes];
+
+    // 抽取獎勵
+    let pearl = getRandomInt(pearlNum.min, pearlNum.max);
+    let qualityUpgradeSet = getRandomInt(1, qualityUpgradeSetNum.max + 1);
+    let coin = 0;
+    const recievedPrizes = [];
+    for(let i = 0; i < itemNum; i++) {
+      const prize = getRandomItem(prizes);
+      if (prize.type === 'pearl') {
+        pearl += prize.value;
+      }
+      if (prize.type === 'qualityUpgradeSet') {
+        qualityUpgradeSet += prize.value;
+      }
+      if (prize.type === 'coin') {
+        coin += prize.value;
+      }
+      recievedPrizes.push(prize);
+    }
+
+    // 更新戰鬥紀錄
+    userRecord.isClaimed = true;
+    userRecord.receivedPrize = recievedPrizes;
+    userRecord.receivedPearl = pearl;
+    userRecord.receivedQualityUpgradeSet = qualityUpgradeSet;
+
+    await worldBoss.save();
+
+    // 更新用戶資料
+    user.pearl += pearl;
+    user.qualityUpgradeSet += qualityUpgradeSet;
+    user.currency += coin;
+    await user.save();
+
+    res.status(200).json({ pearl, qualityUpgradeSet, recievedPrizes });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法領取世界首領獎勵' });
   }
 }

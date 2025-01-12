@@ -11,8 +11,10 @@ module.exports = {
   async execute(interaction) {
     const discordId = interaction.user.id;
 
+    await interaction.deferReply(); // 如果是 Slash 指令，先延遲回應
+
     if (interaction.bot) {
-      return interaction.reply({ content: '機器人無法挖礦', ephemeral: true });
+      return interaction.editReply({ content: '機器人無法挖礦', ephemeral: true });
     }
 
     // 檢查使用者是否存在，如果使用者不存在，創建一個新的使用者
@@ -136,7 +138,7 @@ module.exports = {
       .setColor(user.color || 0x686D76)
       .setDescription(msg);
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: [actionRow],
     });

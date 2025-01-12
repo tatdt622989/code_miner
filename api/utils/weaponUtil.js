@@ -24,13 +24,13 @@ const getQualityData = (quality) => {
     case 2:
       return { qualityUpgradeSet: 1, probability: 0.5, increase: 2 };
     case 3:
-      return { qualityUpgradeSet: 1, probability: 0.25, increase: 4 };
+      return { qualityUpgradeSet: 2, probability: 0.2, increase: 4 };
     case 4:
-      return { qualityUpgradeSet: 2, probability: 0.1, increase: 6 };
+      return { qualityUpgradeSet: 4, probability: 0.08, increase: 6 };
     case 5:
-      return { qualityUpgradeSet: 3, probability: 0.04, increase: 12 };
+      return { qualityUpgradeSet: 6, probability: 0.04, increase: 12 };
     case 6:
-      return { qualityUpgradeSet: 4, probability: 0.005, increase: 24 };
+      return { qualityUpgradeSet: 10, probability: 0.005, increase: 24 };
     default:
       return null;
   }
@@ -56,7 +56,7 @@ const getQualityName = (quality) => {
 }
 
 /**
- * 取得武器攻擊力
+ * 取得武器攻擊力、防禦力
  * @param {*} quality 武器品質
  * @param {*} level 武器等級
  * @param {*} weaponId 武器id
@@ -64,7 +64,7 @@ const getQualityName = (quality) => {
  * @returns {number} min 最小攻擊力
  * @returns {number} max 最大攻擊力
  */
-const getWeaponAttack = async(weaponId, quality, level) => {
+const getWeaponData = async(weaponId, quality, level) => {
   if (level < 0 || level > 100) {
     return null;
   }
@@ -79,6 +79,10 @@ const getWeaponAttack = async(weaponId, quality, level) => {
       min: weapon.basicAttack.min * qualityData.increase,
       max: weapon.basicAttack.max * qualityData.increase
     }
+    const qualityWeaponBasicDefense = {
+      min: weapon.basicDefense.min * qualityData.increase,
+      max: weapon.basicDefense.max * qualityData.increase
+    }
     for (let i = 0; i < level; i++) {
       const strengthenData = getStrengthenData(i+1);
       if (!strengthenData) {
@@ -86,12 +90,14 @@ const getWeaponAttack = async(weaponId, quality, level) => {
       }
       qualityWeaponBasicAttack.min = (qualityWeaponBasicAttack.min * strengthenData.increase).toFixed(2);
       qualityWeaponBasicAttack.max = (qualityWeaponBasicAttack.max * strengthenData.increase).toFixed(2);
+      qualityWeaponBasicDefense.min = (qualityWeaponBasicDefense.min * strengthenData.increase).toFixed(2);
+      qualityWeaponBasicDefense.max = (qualityWeaponBasicDefense.max * strengthenData.increase).toFixed(2);
     }
-    return qualityWeaponBasicAttack
+    return { attack: qualityWeaponBasicAttack, defense: qualityWeaponBasicDefense };
   } catch (err) {
     console.log(err);
     return null;
   }
 }
 
-module.exports = { getStrengthenData, getQualityData, getWeaponAttack, getQualityName };
+module.exports = { getStrengthenData, getQualityData, getWeaponData, getQualityName };

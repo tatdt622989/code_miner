@@ -17,7 +17,8 @@ module.exports = {
           { name: '礦場', value: 'mine' },
           { name: '鑰匙', value: 'key' },
           { name: '寵物', value: 'pet' },
-          { name: '藥水', value: 'potion' }
+          { name: '藥水', value: 'potion' },
+          { name: '武器', value: 'weapon' }
         )
     )
     .addStringOption(option =>
@@ -30,10 +31,17 @@ module.exports = {
     const itemId = optionValue && optionValue[1] || interaction.options?.getString('item_id');
     const itemChildId = optionValue && optionValue[2] || interaction.options?.getString('item_child_id');
 
+    // 判斷是按鈕互動還是指令互動，先回應延遲
+    if (interaction.isButton()) {
+      await interaction.deferUpdate(); // 如果是按鈕互動，先告訴 Discord 正在處理
+    } else if (interaction.isChatInputCommand()) {
+      await interaction.deferReply(); // 如果是 Slash 指令，先延遲回應
+    }
+
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`).catch(() => { return { data: null }; });
     if (!user.data) {
-      return interaction.reply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
+      return interaction.editReply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
     }
 
     const buttonList = [];
@@ -52,7 +60,7 @@ module.exports = {
             .setStyle('Primary');
           buttonList.push(button);
         });
-        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n\n` +
+        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n 工具可以提升挖到礦的數量\n\n` +
           `${tools.data.map(tool => `<:${tool.emojiName}:${tool.emojiId}> ${tool.name} - **${tool.owned ? '已擁有' : formatWithThousandSeparators(tool.price) + ' <:coin:1271510831359852709>'}**`).join('\n')}`;
       } else if (item === 'mine') {
         const mines = await axios.get(`${process.env.API_URL}/game/mines/${discordId}`).catch(() => { return { data: [] }; });
@@ -66,7 +74,7 @@ module.exports = {
             .setStyle('Primary');
           buttonList.push(button);
         });
-        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n\n` +
+        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n 礦場可以提升挖到礦的數量和品質\n\n` +
           `${mines.data.map(mine => `<:${mine.emojiName}:${mine.emojiId}> ${mine.name} - **${mine.owned ? '已擁有' : formatWithThousandSeparators(mine.price) + ' <:coin:1271510831359852709>'}**`).join('\n')}`;
       } else if (item === 'key') {
         const keyPrice = 5000;
@@ -86,7 +94,7 @@ module.exports = {
           buttonList.push(button);
         });
         msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
-          `擁有鑰匙: **${user.data.raffleTicket}** <:key:1274402290006233088>\n\n` +
+          `擁有鑰匙: **${user.data.raffleTicket}** <:key:1274402290006233088>\n 鑰匙可以用來開啟寶箱，獲得隨機的道具\n\n` +
           `${keys.map(key => `<:${key.emojiName}:${key.emojiId}> ${key.name} - **${formatWithThousandSeparators(key.price) + ' <:coin:1271510831359852709>'}**`).join('\n')}`;
       } else if (item === 'pet') {
         const pets = await axios.get(`${process.env.API_URL}/game/pets/${discordId}`).catch(() => { return { data: [] }; });
@@ -129,7 +137,7 @@ module.exports = {
             buttonList.push(button);
           });
         });
-        msg = `擁有魔法藥草: **${user.data.magicalHerb}** <:magical_herb:1302301265950277673>\n` +
+        msg = `擁有魔法藥草: **${user.data.magicalHerb}** <:magical_herb:1302301265950277673>\n 藥水可以暫時提升各種效果，增加獲得道具的效率 \n` +
           `同種類藥水需等上一種效果結束後才能再次使用\n\n`;
         Object.keys(potionInfo).map(key => {
           const info = potionInfo[key];
@@ -146,6 +154,21 @@ module.exports = {
           });
           msg += `\`效果: ${info.description}\`\n\n`;
         }).join('\n');
+      } else if (item === 'weapon') {
+        const weapons = await axios.get(`${process.env.API_URL}/game/weapons/${discordId}`).catch(() => { return { data: [] }; });
+        weapons.data.forEach(weapon => {
+          const disabled = weapon.owned || weapon.price > user.data.currency || !weapon.isAvailable;
+          const button = new ButtonBuilder()
+            .setCustomId(`buy_weapon_${weapon._id}`)
+            .setEmoji(weapon.emojiId)
+            .setLabel(`${weapon.name} - ${weapon.owned ? '已擁有' : formatWithThousandSeparators(weapon.price)}`)
+            .setDisabled(disabled)
+            .setStyle('Primary');
+          buttonList.push(button);
+        });
+        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n 武器可以用來攻擊世界首領 \n 強化、提升品質都可以讓武器更強 \n\n **武器化到+15以上，才能購買下一階武器** \n\n` +
+        `${weapons.data.map(weapon => `<:${weapon.emojiName}:${weapon.emojiId}> ${weapon.name} - **${weapon.owned ? '已擁有' : formatWithThousandSeparators(weapon.price) + ' <:coin:1271510831359852709>'}**`).join('\n')}` +
+        ` \n\n ⚠️ **購買武器後，需到 [個人資料 -> 更換武器] 裝備**`;
       }
       // 每一行按鈕數量
       while (buttonList.length) {
@@ -171,6 +194,8 @@ module.exports = {
           res = await axios.post(`${process.env.API_URL}/game/buyPet`, { discordId, petId: itemId });
         } else if (item === 'potion') {
           res = await axios.post(`${process.env.API_URL}/game/buyPotion`, { discordId, type: itemId, timeId: itemChildId });
+        } else if (item === 'weapon') {
+          res = await axios.post(`${process.env.API_URL}/game/buyWeapon`, { discordId, weaponId: itemId });
         }
         msg = res.data?.message;
       } catch (err) {
@@ -204,15 +229,7 @@ module.exports = {
       .setDescription(msg)
       .setColor(user.data.color || 0x000000);
 
-    const lastMessage = interaction.message;
-    if (lastMessage && !itemId) {
-      await lastMessage.edit({
-        embeds: [embed],
-        components: actionRow,
-      });
-      return interaction.deferUpdate();
-    }
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: actionRow,
     });

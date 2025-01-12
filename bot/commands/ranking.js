@@ -12,11 +12,18 @@ module.exports = {
     const discordId = interaction.user.id;
 
     try {
+      // 判斷是按鈕互動還是指令互動，先回應延遲
+      if (interaction.isButton()) {
+        await interaction.deferUpdate(); // 如果是按鈕互動，先告訴 Discord 正在處理
+      } else if (interaction.isChatInputCommand()) {
+        await interaction.deferReply(); // 如果是 Slash 指令，先延遲回應
+      }
+
       // 獲取用戶資料，限制15名
       const res = await axios.get(`${process.env.API_URL}/users`).catch(() => { return { data: [] }; });
 
       if (!res.data.length) {
-        return interaction.reply({ content: '空', ephemeral: true });
+        return interaction.editReply({ content: '空', ephemeral: true });
       }
 
       const users = res.data.slice(0, 15);
@@ -38,19 +45,10 @@ module.exports = {
 
       const actionRow = new ActionRowBuilder().addComponents(returnButton);
 
-      const lastMessage = interaction.message;
-      if (lastMessage) {
-        await lastMessage.edit({
-          content: null,
-          embeds: [embed],
-          components: [actionRow],
-        });
-      } else {
-        await interaction.reply({ embeds: [embed], components: [actionRow] });
-      }
+      await interaction.editReply({ embeds: [embed], components: [actionRow] });
     } catch (error) {
       console.error(error);
-      return interaction.reply({ content: '錯誤', ephemeral: true });
+      return interaction.editReply({ content: '錯誤', ephemeral: true });
     }
   }
 };

@@ -1,6 +1,6 @@
 const baseValue = 100; // 可調整的基礎值
-const growthFactor = 1.5; // 可調整的增長因子
-const maxLevel = 300; // 最大等級
+const growthFactor = 1.7; // 可調整的增長因子
+const maxLevel = 400; // 最大等級
 
 // 打印等級經驗表
 const experienceTable = generateExperienceTable(baseValue, growthFactor);

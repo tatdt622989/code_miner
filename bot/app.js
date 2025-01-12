@@ -92,6 +92,12 @@ client.on('interactionCreate', async interaction => {
       // 處理按鈕
       const [command, ...optionValue] = interaction.customId.split('_');
       await handleCommand(interaction, command, optionValue);
+  } else if(interaction.isStringSelectMenu()) {
+     // 處理選擇菜單
+     const selectedOption = interaction.values[0]; // 取得選擇的值
+     console.log(selectedOption.split('_'));
+     const [command, ...optionValue] = selectedOption.split('_');
+     await handleCommand(interaction, command, optionValue);
   }
 });
 

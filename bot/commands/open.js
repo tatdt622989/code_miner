@@ -16,14 +16,17 @@ module.exports = {
     const discordId = interaction.user.id;
     const itemId = optionValue && optionValue[0] || interaction.options?.getString('item_id');
 
+    // 判斷是按鈕互動還是指令互動，先回應延遲
+    await interaction.deferReply();
+
     if (!itemId) {
-      return interaction.reply({ content: '請輸入寶箱ID', ephemeral: true });
+      return interaction.editReply({ content: '請輸入寶箱ID', ephemeral: true });
     }
 
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`).catch(() => { return { data: null }; });
     if (!user.data) {
-      return interaction.reply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
+      return interaction.editReply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
     }
 
     try {
@@ -31,12 +34,12 @@ module.exports = {
       const chest = await axios.get(`${process.env.API_URL}/game/rafflePool/${itemId}`);
 
       if (!chest.data) {
-        return interaction.reply({ content: '寶箱不存在', ephemeral: true });
+        return interaction.editReply({ content: '寶箱不存在', ephemeral: true });
       }
 
       // 檢查使用者等級
       if (user.data.level < chest.data.levelRequirement) {
-        return interaction.reply({ content: `等級不足，需要等級 ${chest.data.levelRequirement}`, ephemeral: true });
+        return interaction.editReply({ content: `等級不足，需要等級 ${chest.data.levelRequirement}`, ephemeral: true });
       }
 
       // 獲取寶箱內容
@@ -68,14 +71,14 @@ module.exports = {
 
       const actionRow = new ActionRowBuilder().addComponents(returnButton, tryAgainButton);
 
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [embed],
         components: [actionRow],
         ephemeral: true,
       });
     } catch (error) {
       console.log(error);
-      return interaction.reply({ content: error?.response?.data?.error || '開啟失敗', ephemeral: true });
+      return interaction.editReply({ content: error?.response?.data?.error || '開啟失敗', ephemeral: true });
     }
   }
 };

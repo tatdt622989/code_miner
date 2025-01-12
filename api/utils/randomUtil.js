@@ -20,11 +20,11 @@ const getRandomInt = (min, max) => {
 
 // 根據物品機率隨機取得物品
 const getRandomItem = (array) => {
-	const totalWeight = array.reduce((acc, item) => acc + item.rarity, 0);
+	const totalWeight = array.reduce((acc, item) => acc + (item.rarity || item.weight), 0);
 	const randomNum = getRandomFloat(0, totalWeight);
 	let weightSum = 0;
 	for (let i = 0; i < array.length; i++) {
-		weightSum += array[i].rarity;
+		weightSum += array[i].rarity || array[i].weight;
 		weightSum = parseFloat(weightSum.toFixed(2));
 		if (randomNum <= weightSum) {
 			return array[i];

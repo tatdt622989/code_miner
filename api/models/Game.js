@@ -278,6 +278,7 @@ const worldBossSchema = new mongoose.Schema({
 
 // 世界BOSS出現紀錄
 const worldBossRecordSchema = new mongoose.Schema({
+	attack: rangeSchema,
 	worldBoss: {
 		type: mongoose.Schema.Types.ObjectId,
 		ref: 'WorldBoss',
@@ -295,6 +296,36 @@ const worldBossRecordSchema = new mongoose.Schema({
 		required: true,
 		default: 1,
 	},
+	participatingUsers: [{
+		userDamage: {
+			type: Number,
+			required: true,
+		},
+		user: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'User',
+		},
+		isFinalHit: {
+			type: Boolean,
+			default: false,
+		},
+		isClaimed: {
+			type: Boolean,
+			default: false,
+		},
+		receivedPrize: [{
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'Prize',
+		}],
+		receivedPearl: {
+			type: Number,
+			default: 0
+		},
+		receivedQualityUpgradeSet: {
+			type: Number,
+			default: 0
+		}
+	}]
 }, { timestamps: true });
 
 // minecraft序號

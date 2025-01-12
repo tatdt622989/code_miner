@@ -25,7 +25,10 @@ const {
   bet,
   equipWeapon,
   strengthenWeapon,
-  upgradeWeaponQuality
+  upgradeWeaponQuality,
+  attackBoss,
+  claimWorldBossReward,
+  checkWorldBossReward
 } = require('../controllers/gameController');
 
 // 挖礦
@@ -56,7 +59,7 @@ router.get('/pet/:petId', listPet);
 router.get('/potions', listPotion);
 
 // 武器列表
-router.get('/weapons', listWeapons);
+router.get('/weapons/:discordId', listWeapons);
 
 // 世界首領列表
 router.get('/worldBosses', listWorldBosses);
@@ -96,5 +99,14 @@ router.post('/lottery/open', openChest);
 
 // 賭博
 router.post('/bet', bet);
+
+// 攻擊世界首領
+router.post('/worldBoss/attack', attackBoss);
+
+// 獲取世界首領獎勵
+router.post('/worldBoss/claimReward', claimWorldBossReward);
+
+// 檢查是否有未領取的世界首領獎勵
+router.post('/worldBoss/checkReward', checkWorldBossReward);
 
 module.exports = router;

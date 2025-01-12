@@ -17,20 +17,27 @@ module.exports = {
     const discordId = interaction.user.id;
     const chestId = optionValue && optionValue[0] || interaction.options?.getString('chest-id');
 
+    // 判斷是按鈕互動還是指令互動，先回應延遲
+    if (interaction.isButton()) {
+      await interaction.deferUpdate(); // 如果是按鈕互動，先告訴 Discord 正在處理
+    } else if (interaction.isChatInputCommand()) {
+      await interaction.deferReply(); // 如果是 Slash 指令，先延遲回應
+    }
+
     if (!chestId) {
-      return interaction.reply({ content: '請輸入寶箱ID', ephemeral: true });
+      return interaction.editReply({ content: '請輸入寶箱ID', ephemeral: true });
     }
 
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`).catch(() => { return { data: null }; });
     if (!user.data) {
-      return interaction.reply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
+      return interaction.editReply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
     }
 
     // 獲取寶箱內容
     const chest = await axios.get(`${process.env.API_URL}/game/rafflePool/${chestId}`).catch(() => { return { data: null }; });
     if (!chest.data) {
-      return interaction.reply({ content: '寶箱不存在', ephemeral: true });
+      return interaction.editReply({ content: '寶箱不存在', ephemeral: true });
     }
 
     const prizes = chest.data.prizes.sort((a, b) => a.rarity - b.rarity);
@@ -55,15 +62,7 @@ module.exports = {
 
     const actionRow = new ActionRowBuilder().addComponents(openButton, returnButton);
 
-    const lastMessage = interaction.message;
-    if (lastMessage) {
-      await lastMessage.edit({
-        embeds: [embed],
-        components: [actionRow],
-      });
-      return interaction.deferUpdate();
-    }
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: [actionRow],
     });

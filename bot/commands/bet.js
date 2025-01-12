@@ -29,12 +29,19 @@ module.exports = {
     const actionRow = new ActionRowBuilder();
     const embed = new EmbedBuilder()
 
+    // 判斷是按鈕互動還是指令互動，先回應延遲
+    if (interaction.isButton()) {
+      await interaction.deferUpdate(); // 如果是按鈕互動，先告訴 Discord 正在處理
+    } else if (interaction.isChatInputCommand()) {
+      await interaction.deferReply(); // 如果是 Slash 指令，先延遲回應
+    }
+
     console.log('amount', amount, 'magnification', magnification);
 
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`).catch(() => { return { data: null }; });
     if (!user.data) {
-      return interaction.reply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
+      return interaction.editReply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
     }
 
     if (!amount && !magnification) {
@@ -51,13 +58,13 @@ module.exports = {
       embed.setColor(user.data.color || 0x000000);
     } else {
       if (amount < 1000) {
-        return interaction.reply({ content: '下注金額不能低於1000', ephemeral: true });
+        return interaction.editReply({ content: '下注金額不能低於1000', ephemeral: true });
       }
       if (amount > user.data.currency) {
-        return interaction.reply({ content: '金幣不足', ephemeral: true });
+        return interaction.editReply({ content: '金幣不足', ephemeral: true });
       }
       if (Number.isNaN(amount)) {
-        return interaction.reply({ content: '請輸入數字', ephemeral: true });
+        return interaction.editReply({ content: '請輸入數字', ephemeral: true });
       }
 
       try {
@@ -75,7 +82,7 @@ module.exports = {
           .setThumbnail(thumbnail);
       } catch (error) {
         console.error(error);
-        return interaction.reply({ content: error.response.data.message, ephemeral: true });
+        return interaction.editReply({ content: error.response.data.message, ephemeral: true });
       }
 
     }
@@ -87,15 +94,7 @@ module.exports = {
 
     actionRow.addComponents(returnButton);
 
-    const lastMessage = interaction.message;
-    if (lastMessage && !amount && !magnification) {
-      await lastMessage.edit({
-        embeds: [embed],
-        components: [actionRow],
-      });
-      return interaction.deferUpdate();
-    }
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: [actionRow],
     });

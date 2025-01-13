@@ -30,7 +30,7 @@ module.exports = {
       `<:key:1274402290006233088> 購買鑰匙: /buy key \n` +
       `<:magic_herb:1302301265950277673> 購買藥草: /buy potion \n` +
       `<:afewofcoin:1283811816509800458> 購買寵物: /buy pet \n` +
-      `<:afewofcoin:1325076035343224944> 購買武器: /buy weapon \n` +
+      `<:afewofcoin:1328357614676873257> 購買武器: /buy weapon \n` +
       `或使用下方按鈕購買`;
 
     const embed = new EmbedBuilder()
@@ -70,7 +70,7 @@ module.exports = {
 
     const weaponButton = new ButtonBuilder()
       .setCustomId('buy_weapon')
-      .setEmoji('1325076035343224944')
+      .setEmoji('1328357614676873257')
       .setLabel('購買武器')
       .setStyle('Primary');
 

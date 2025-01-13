@@ -904,13 +904,19 @@ exports.strengthenWeapon = async (req, res) => {
         userWeapon.attack[attr] = (userWeapon.attack[attr] * strengthenData.increase).toFixed(2);
         userWeapon.defense[attr] = (userWeapon.defense[attr] * strengthenData.increase).toFixed(2);
       });
-      await user.save();
-      console.log('強化成功', userWeapon.weapon.name, userWeapon.level);
-      res.status(200).json({ message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}` });
+      res.status(200).json({
+        success: true,
+        message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}`
+      });
     } else {
       console.log('強化失敗', userWeapon.weapon.name, userWeapon.level);
-      res.status(200).json({ message: `強化失敗！` });
+      res.status(200).json({
+        success: false,
+        message: `強化失敗！`
+      });
     }
+
+    await user.save();
 
   } catch (error) {
     console.log(error);
@@ -1407,5 +1413,46 @@ exports.claimWorldBossReward = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法領取世界首領獎勵' });
+  }
+}
+
+// 檢查當前強化的武器消耗的強化寶珠和品質升級套組
+exports.checkStrengthenWeaponCost = async (req, res) => {
+  const { discordId, userWeaponId } = req.body;
+
+  if (!discordId || !userWeaponId) {
+    return res.status(400).json({ error: '需要用戶ID和武器ID' });
+  }
+
+  try {
+    const user = await User.findOne({ discordId }).populate({
+      path: 'weapons',
+      populate: {
+        path: 'weapon',
+        model: 'Weapon',
+      }
+    })
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const userWeapon = user.weapons.find(w => {
+      return w.id === userWeaponId
+    });
+    if (!userWeapon) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+
+    const strengthenData = getStrengthenData(userWeapon.level + 1);
+    const qualityData = getQualityData(userWeapon.quality + 1);
+
+    res.status(200).json({
+      pearl: strengthenData?.pearl || 0,
+      qualityUpgradeSet: qualityData?.qualityUpgradeSet || 0
+    });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法檢查強化武器消耗' });
   }
 }

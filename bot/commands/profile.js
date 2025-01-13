@@ -49,7 +49,7 @@ module.exports = {
     // 武器按鈕
     const weaponButton = new ButtonBuilder()
       .setCustomId('weapon')
-      .setEmoji('1325076035343224944')
+      .setEmoji('1328357614676873257')
       .setLabel('武器')
       .setStyle('Primary');
 

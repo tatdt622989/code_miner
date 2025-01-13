@@ -28,7 +28,8 @@ const {
   upgradeWeaponQuality,
   attackBoss,
   claimWorldBossReward,
-  checkWorldBossReward
+  checkWorldBossReward,
+  checkStrengthenWeaponCost
 } = require('../controllers/gameController');
 
 // 挖礦
@@ -108,5 +109,8 @@ router.post('/worldBoss/claimReward', claimWorldBossReward);
 
 // 檢查是否有未領取的世界首領獎勵
 router.post('/worldBoss/checkReward', checkWorldBossReward);
+
+// 檢查當前強化的武器消耗的強化寶珠和品質升級套組
+router.post('/checkStrengthenWeaponCost', checkStrengthenWeaponCost);
 
 module.exports = router;

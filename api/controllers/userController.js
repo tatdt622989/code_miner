@@ -102,7 +102,7 @@ exports.getUser = async (req, res) => {
       level: levelData.level,
       weapons: user.weapons.map(w => ({
         ...w._doc,
-        qualityName: getQualityName(w.quality),
+        qualityName: getQualityName(w.quality)
       })),
       color,
     });

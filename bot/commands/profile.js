@@ -55,7 +55,7 @@ module.exports = {
 
     // 世界首領按鈕
     const bossButton = new ButtonBuilder()
-      .setCustomId('worldBoss')
+      .setCustomId('world-boss')
       .setEmoji('1325337103164506154')
       .setLabel('世界首領')
       .setStyle('Primary');

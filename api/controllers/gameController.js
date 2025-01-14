@@ -57,6 +57,26 @@ function getMineReward(mine, tool, miningRewardDouble = {}) {
   return { minerals, exp, totalValue };
 }
 
+async function generateWorldBossRecord() {
+  const allWorldBosses = await WorldBoss.find({}).sort({ level: -1 });
+  const randomBoss = allWorldBosses[getRandomInt(0, allWorldBosses.length - 1)];
+  const quality = getRandomInt(1, 6);
+  const hpTimes = [1, 5, 15, 30, 100, 320][quality - 1];
+  const attackTimes = [1, 3, 5, 7, 9, 15][quality - 1];
+  const newBoss = new WorldBossRecord({
+    worldBoss: randomBoss.id,
+    hp: randomBoss.baseHp * hpTimes,
+    remainingHp: randomBoss.baseHp * hpTimes,
+    attack: {
+      min: randomBoss.basicAttack.min * attackTimes,
+      max: randomBoss.basicAttack.max * attackTimes,
+    },
+    quality,
+  });
+  await newBoss.save();
+  return await WorldBossRecord.findOne({}).populate('worldBoss').sort({ createdAt: -1 });
+}
+
 // 挖礦
 exports.mine = async (req, res) => {
   const { discordId } = req.params;
@@ -465,8 +485,21 @@ exports.listWorldBosses = async (req, res) => {
 // 出現中的世界首領
 exports.getCurrentWorldBoss = async (req, res) => {
   try {
-    const currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 });
-    res.status(200).json(currentBoss);
+    const currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 }).populate('worldBoss');
+    const expireTime = currentBoss.createdAt.getTime() + currentBoss.quality * 24 * 60 * 60 * 1000;
+    if (expireTime < Date.now()) {
+      const newBoss = await generateWorldBossRecord();
+      return res.status(200).json({
+        ...newBoss._doc,
+        expireTime: newBoss.createdAt.getTime() + newBoss.quality * 24 * 60 * 60 * 1000,
+        qualityName: getQualityName(newBoss.quality),
+      })
+    }
+    res.status(200).json({
+      ...currentBoss._doc,
+      expireTime,
+      qualityName: getQualityName(currentBoss.quality),
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法取得首領' });
@@ -700,7 +733,6 @@ exports.buyPotion = async (req, res) => {
     potionInfoCopy[3].active = autoMine.active;
 
     // 檢查是否在使用狀態
-    console.log('potionInfoCopy', potionInfoCopy);
     if (potionInfoCopy[type].active) {
       return res.status(400).json({ error: '藥水效果仍在使用中' });
     }
@@ -904,12 +936,12 @@ exports.strengthenWeapon = async (req, res) => {
         userWeapon.attack[attr] = (userWeapon.attack[attr] * strengthenData.increase).toFixed(2);
         userWeapon.defense[attr] = (userWeapon.defense[attr] * strengthenData.increase).toFixed(2);
       });
+      console.log('強化成功', userWeapon.weapon.name, userWeapon.level, user._id);
       res.status(200).json({
         success: true,
         message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}`
       });
     } else {
-      console.log('強化失敗', userWeapon.weapon.name, userWeapon.level);
       res.status(200).json({
         success: false,
         message: `強化失敗！`
@@ -968,11 +1000,17 @@ exports.upgradeWeaponQuality = async (req, res) => {
       userWeapon.attack = attack;
       userWeapon.defense = defense;
       await user.save();
-      console.log('提升品質成功', userWeapon.weapon.name, userWeapon.quality);
-      res.status(200).json({ message: `成功提升 ${userWeapon.weapon.name} 到 **${getQualityName(userWeapon.quality)}** 品質！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}` });
+      console.log('提升品質成功', userWeapon.weapon.name, userWeapon.quality, user._id);
+      res.status(200).json({
+        message: `成功提升 ${userWeapon.weapon.name} 到 **${getQualityName(userWeapon.quality)}** 品質！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}`,
+        success: true
+      });
     } else {
       console.log('提升品質失敗', userWeapon.weapon.name, userWeapon.quality);
-      res.status(200).json({ message: `提升品質失敗！` });
+      res.status(200).json({
+        message: `提升品質失敗！`,
+        success: false
+      });
     }
   } catch (error) {
     console.log(error);
@@ -1146,23 +1184,7 @@ exports.attackBoss = async (req, res) => {
     }
     // 沒有世界首領或過期的話，生成新的世界首領
     if (!currentBoss || currentBoss.remainingHp <= 0 || isExpired) {
-      const allWorldBosses = await WorldBoss.find({}).sort({ level: -1 });
-      const randomBoss = allWorldBosses[getRandomInt(0, allWorldBosses.length - 1)];
-      const quality = getRandomInt(1, 6);
-      const hpTimes = [1, 5, 15, 30, 100, 300][quality - 1];
-      const attackTimes = [1, 3, 5, 7, 9, 15][quality - 1];
-      const newBoss = new WorldBossRecord({
-        worldBoss: randomBoss.id,
-        hp: randomBoss.baseHp * hpTimes,
-        remainingHp: randomBoss.baseHp * hpTimes,
-        attack: {
-          min: randomBoss.basicAttack.min * attackTimes,
-          max: randomBoss.basicAttack.max * attackTimes,
-        },
-        quality,
-      });
-      await newBoss.save();
-      currentBoss = await WorldBossRecord.findOne({}).populate('worldBoss').sort({ createdAt: -1 });
+      currentBoss = await generateWorldBossRecord();
     }
 
     // 玩家攻擊

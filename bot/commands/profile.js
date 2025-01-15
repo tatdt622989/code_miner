@@ -34,10 +34,10 @@ module.exports = {
       `金幣 : **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
       `鑰匙 : **${user.data.raffleTicket}** <:key:1274402290006233088>\n` +
       `魔法藥草 : **${user.data.magicalHerb}** <:magic_herb:1302301265950277673>\n` +
-      `裝備工具 : **${user.data.equipped.tool.name}** <:${user.data.equipped.tool.emojiName}:${user.data.equipped.tool.emojiId}>\n` +
-      `裝備礦場 : **${user.data.equipped.mine.name}** <:${user.data.equipped.mine.emojiName}:${user.data.equipped.mine.emojiId}>\n` +
-      `裝備寵物 : ${user.data.equipped.pet ? `**${user.data.equipped.pet.name}** <:${user.data.equipped.pet.emojiName}:${user.data.equipped.pet.emojiId}>` : '無'}\n` +
-      `裝備武器 : ${userWeapon ? `**${userWeapon.weapon.name}** <:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}>` : '無'}`;
+      `裝備工具 : <:${user.data.equipped.tool.emojiName}:${user.data.equipped.tool.emojiId}> **${user.data.equipped.tool.name}** \n` +
+      `裝備武器 : ${userWeapon ? `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> **[${userWeapon.qualityName}] ${userWeapon.weapon.name}** +${userWeapon.level}` : '無'}\n` +
+      `裝備礦場 : <:${user.data.equipped.mine.emojiName}:${user.data.equipped.mine.emojiId}> **${user.data.equipped.mine.name}** \n` +
+      `裝備寵物 : ${user.data.equipped.pet ? `<:${user.data.equipped.pet.emojiName}:${user.data.equipped.pet.emojiId}> **${user.data.equipped.pet.name}**` : '無'}`;
 
     // 挖礦按鈕
     const button = new ButtonBuilder()
@@ -59,6 +59,25 @@ module.exports = {
       .setEmoji('1325337103164506154')
       .setLabel('世界首領')
       .setStyle('Primary');
+
+    // 領取世界首領獎勵按鈕
+    const rewardButton = new ButtonBuilder()
+      .setCustomId('world-boss-reward')
+      .setEmoji('1272914873084416102')
+      .setLabel('領取世界首領獎勵')
+      .setStyle('Primary');
+    try {
+      const checkReward = await axios.get(`${process.env.API_URL}/worldBoss/checkReward/${discordId}`);
+      if (checkReward.data) {
+        const hasReward = checkReward.data.hasReward;
+        if (hasReward) {
+          rewardButton.setDisabled(true);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      rewardButton.setDisabled(true);
+    }
 
     // 商店按鈕
     const storeButton = new ButtonBuilder()
@@ -90,7 +109,7 @@ module.exports = {
 
     const actionRow = [
       new ActionRowBuilder().addComponents(button, storeButton, chestsButton, rankingButton, betButton),
-      new ActionRowBuilder().addComponents( weaponButton, bossButton),
+      new ActionRowBuilder().addComponents( weaponButton, bossButton, rewardButton),
     ];
 
     // 訊息輸出

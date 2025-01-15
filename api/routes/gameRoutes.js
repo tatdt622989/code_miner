@@ -108,7 +108,7 @@ router.post('/worldBoss/attack', attackBoss);
 router.post('/worldBoss/claimReward', claimWorldBossReward);
 
 // 檢查是否有未領取的世界首領獎勵
-router.post('/worldBoss/checkReward', checkWorldBossReward);
+router.get('/worldBoss/checkReward/:discordId', checkWorldBossReward);
 
 // 檢查當前強化的武器消耗的強化寶珠和品質升級套組
 router.post('/checkStrengthenWeaponCost', checkStrengthenWeaponCost);

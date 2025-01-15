@@ -13,7 +13,11 @@ module.exports = {
     const userId = optionValue && optionValue[0] || interaction.options?.getString('item_id');
 
     // 判斷是按鈕互動還是指令互動，先回應延遲
-    await interaction.deferReply(); // 如果是 Slash 指令，先延遲回應
+    if (userId) {
+      await interaction.deferReply();
+    } else {
+      await interaction.deferUpdate();
+    }
 
     // 獲取用戶資料
     const user = await axios.get(`${process.env.API_URL}/users/${discordId}`);
@@ -61,7 +65,7 @@ module.exports = {
       } else {
         const embed = new EmbedBuilder()
           .setColor(user.data.color || 0x000000)
-          .setTitle('武器品質升級')
+          .setTitle(`${user.data.name} 的武器品質升級`)
           .setDescription(`擁有的強化升級模組: **${user.data.qualityUpgradeSet || 0}** <:quality_set:1325383804113649734> \n\n 品質升級武器： \n `);
 
         const actionsRow = new ActionRowBuilder();

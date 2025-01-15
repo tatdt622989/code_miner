@@ -59,7 +59,7 @@ module.exports = {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle('武器一覽')
+      .setTitle(`${user.data.name} 的武器一覽`)
       .setDescription(msg)
       .setColor(user.data.color || 0x000000);
 

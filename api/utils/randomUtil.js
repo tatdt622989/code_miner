@@ -11,29 +11,29 @@ const getRandomFloat = (min, max) => {
 
 // 生成安全的隨機整數
 const getRandomInt = (min, max) => {
-	const array = new Uint32Array(1);
-	crypto.randomFillSync(array);
-	const randomNumber = array[0] / (0xFFFFFFFF + 1); // 轉換為0-1之間的數字
-	const result = Math.floor(randomNumber * (max - min + 1) + min);
-	return result;
+  const array = new Uint32Array(1);
+  crypto.randomFillSync(array);
+  const randomNumber = array[0] / (0xFFFFFFFF + 1); // 轉換為0-1之間的數字
+  const result = Math.floor(randomNumber * (max - min + 1) + min);
+  return result;
 };
 
 // 根據物品機率隨機取得物品
 const getRandomItem = (array) => {
-	const totalWeight = array.reduce((acc, item) => acc + (item.rarity || item.weight), 0);
-	const randomNum = getRandomFloat(0, totalWeight);
-	let weightSum = 0;
-	for (let i = 0; i < array.length; i++) {
-		weightSum += array[i].rarity || array[i].weight;
-		weightSum = parseFloat(weightSum.toFixed(2));
-		if (randomNum <= weightSum) {
-			return array[i];
-		}
-	}
+  const totalWeight = array.reduce((acc, item) => acc + (item.rarity || item.weight), 0);
+  const randomNum = getRandomFloat(0, totalWeight);
+  let weightSum = 0;
+  for (let i = 0; i < array.length; i++) {
+    weightSum += array[i].rarity || array[i].weight;
+    weightSum = parseFloat(weightSum.toFixed(2));
+    if (randomNum <= weightSum) {
+      return array[i];
+    }
+  }
 };
 
 module.exports = {
-	getRandomInt,
-	getRandomItem,
-	getRandomFloat
+  getRandomInt,
+  getRandomItem,
+  getRandomFloat
 };

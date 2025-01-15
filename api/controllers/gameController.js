@@ -1158,13 +1158,18 @@ exports.attackBoss = async (req, res) => {
       return res.status(404).json({ error: '找不到使用者' });
     }
 
+    // 檢查玩家是否有裝備武器
+    if (!user.equipped.weapon) {
+      return res.status(400).json({ error: '請先到 **個人資料 -> 武器 -> 裝備武器** 裝備武器' });
+    }
+
     const nowTs = Date.now();
 
     // 是否回補 HP，每半小時回補一次
     const resetTime = user.lastAttackWorldBoss.getTime() + 30 * 60 * 1000;
+    const userMaxHp = getUserLevelAndExperience(user).level > 1 ? getUserLevelAndExperience(user).level * 10 + 100 : 100;
     if (nowTs > resetTime) {
-      const { level } = getUserLevelAndExperience(user);
-      user.hp = level > 1 ? level * 10 + 100 : 100;
+      user.hp = userMaxHp;
     }
 
     // 檢查 HP 是否大於 0
@@ -1192,9 +1197,9 @@ exports.attackBoss = async (req, res) => {
     if (!userWeapon) {
       return res.status(404).json({ error: '找不到武器' });
     }
-    const userAttack = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max);
+    const userDamage = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max);
     let isLastAttack = false;
-    currentBoss.remainingHp = (currentBoss.remainingHp - userAttack).toFixed(2);
+    currentBoss.remainingHp = (currentBoss.remainingHp - userDamage).toFixed(2);
     if (currentBoss.remainingHp <= 0) {
       currentBoss.remainingHp = 0;
       isLastAttack = true;
@@ -1213,13 +1218,13 @@ exports.attackBoss = async (req, res) => {
     // 紀錄玩家戰鬥紀錄
     let userRecord = currentBoss.participatingUsers.find(p => p.user.toString() === user.id);
     if (userRecord) {
-      userRecord.userDamage = (userRecord.userDamage + userAttack).toFixed(2);
+      userRecord.userDamage = (userRecord.userDamage + userDamage).toFixed(2);
       if (isLastAttack) {
         userRecord.isFinalHit = true;
       }
     } else {
       const newRecord = {
-        userDamage: userAttack,
+        userDamage,
         user: user.id,
         isFinalHit: isLastAttack,
       }
@@ -1229,7 +1234,23 @@ exports.attackBoss = async (req, res) => {
     await currentBoss.save();
     await user.save();
 
-    res.status(200).json({ currentBoss, user });
+    res.status(200).json({
+      bossAttack,
+      userDamage,
+      userDefense,
+      userHpRecoveryTime: Math.ceil((resetTime - nowTs) / 1000),
+      isLastAttack,
+      currentBoss: {
+        ...currentBoss._doc,
+        qualityName: getQualityName(currentBoss.quality),
+      },
+      userMaxHp,
+      user,
+      userWeapon: {
+        ...userWeapon._doc,
+        qualityName: getQualityName(userWeapon.quality),
+      }
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法攻擊世界首領' });
@@ -1238,7 +1259,7 @@ exports.attackBoss = async (req, res) => {
 
 // 檢查是否有未領取的世界首領獎勵
 exports.checkWorldBossReward = async (req, res) => {
-  const { discordId } = req.body;
+  const { discordId } = req.params;
 
   if (!discordId) {
     return res.status(400).json({ error: '需要用戶ID' });
@@ -1402,7 +1423,7 @@ exports.claimWorldBossReward = async (req, res) => {
     let qualityUpgradeSet = getRandomInt(1, qualityUpgradeSetNum.max + 1);
     let coin = 0;
     const recievedPrizes = [];
-    for(let i = 0; i < itemNum; i++) {
+    for (let i = 0; i < itemNum; i++) {
       const prize = getRandomItem(prizes);
       if (prize.type === 'pearl') {
         pearl += prize.value;

@@ -105,7 +105,7 @@ router.post('/bet', bet);
 router.post('/worldBoss/attack', attackBoss);
 
 // 獲取世界首領獎勵
-router.post('/worldBoss/claimReward', claimWorldBossReward);
+router.get('/worldBoss/claimReward/:discordId', claimWorldBossReward);
 
 // 檢查是否有未領取的世界首領獎勵
 router.get('/worldBoss/checkReward/:discordId', checkWorldBossReward);

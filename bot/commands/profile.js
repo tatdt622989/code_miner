@@ -67,10 +67,10 @@ module.exports = {
       .setLabel('領取世界首領獎勵')
       .setStyle('Primary');
     try {
-      const checkReward = await axios.get(`${process.env.API_URL}/worldBoss/checkReward/${discordId}`);
+      const checkReward = await axios.get(`${process.env.API_URL}/game/worldBoss/checkReward/${discordId}`);
       if (checkReward.data) {
         const hasReward = checkReward.data.hasReward;
-        if (hasReward) {
+        if (!hasReward) {
           rewardButton.setDisabled(true);
         }
       }

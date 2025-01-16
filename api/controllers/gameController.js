@@ -1234,12 +1234,21 @@ exports.attackBoss = async (req, res) => {
     await currentBoss.save();
     await user.save();
 
+    const isBossDead = currentBoss.remainingHp <= 0;
+
+    // 如果世界首領死亡，生成新的世界首領
+    console.log('currentBoss', currentBoss);
+    if (isBossDead) {
+      currentBoss = await generateWorldBossRecord();
+    }
+
     res.status(200).json({
       bossAttack,
       userDamage,
       userDefense,
       userHpRecoveryTime: Math.ceil((resetTime - nowTs) / 1000),
       isLastAttack,
+      isBossDead,
       currentBoss: {
         ...currentBoss._doc,
         qualityName: getQualityName(currentBoss.quality),
@@ -1276,12 +1285,12 @@ exports.checkWorldBossReward = async (req, res) => {
       remainingHp: { $lte: 0 },
     }).populate('worldBoss').sort({ createdAt: -1 });
     if (!worldBoss) {
-      return res.status(404).json({ error: '找不到世界首領' });
+      return res.status(200).json({ hasReward: false });
     }
 
     const userRecord = worldBoss.participatingUsers.find(p => p.user.toString() === user.id);
     if (!userRecord) {
-      return res.status(404).json({ error: '找不到使用者戰鬥紀錄' });
+      return res.status(200).json({ hasReward: false });
     }
 
     if (userRecord.isClaimed) {
@@ -1297,7 +1306,7 @@ exports.checkWorldBossReward = async (req, res) => {
 
 // 領取世界首領獎勵
 exports.claimWorldBossReward = async (req, res) => {
-  const { discordId } = req.body;
+  const { discordId } = req.params;
 
   if (!discordId) {
     return res.status(400).json({ error: '需要用戶ID' });
@@ -1311,7 +1320,7 @@ exports.claimWorldBossReward = async (req, res) => {
 
     const worldBoss = await WorldBossRecord.findOne({
       'participatingUsers.user': user.id,
-      remainingHp: { $gt: 0 },
+      remainingHp: { $lte: 0 },
     }).populate('worldBoss').sort({ createdAt: -1 });
     if (!worldBoss) {
       return res.status(404).json({ error: '找不到世界首領' });
@@ -1423,8 +1432,11 @@ exports.claimWorldBossReward = async (req, res) => {
     let qualityUpgradeSet = getRandomInt(1, qualityUpgradeSetNum.max + 1);
     let coin = 0;
     const recievedPrizes = [];
+    const codeList = [];
+
     for (let i = 0; i < itemNum; i++) {
       const prize = getRandomItem(prizes);
+      let code;
       if (prize.type === 'pearl') {
         pearl += prize.value;
       }
@@ -1434,7 +1446,34 @@ exports.claimWorldBossReward = async (req, res) => {
       if (prize.type === 'coin') {
         coin += prize.value;
       }
-      recievedPrizes.push(prize);
+      if (prize.type === 'code') {
+        //檢查是否有重複的序號
+        code = codeGenerator(10);
+        while (await Code.findOne({ code })) {
+          code = codeGenerator(10);
+        }
+        codeList.push({
+          code,
+          ...prize._doc
+        });
+      }
+      recievedPrizes.push({
+        ...prize._doc,
+        code: prize.type === 'code' ? code : '',
+      });
+    }
+
+    // 產生的序號寫入資料庫
+    for (let i = 0; i < codeList.length; i++) {
+      console.log(codeList[i]);
+      const newCode = new Code({
+        code: codeList[i].code,
+        used: false,
+        command: codeList[i].command,
+        item: codeList[i].name,
+      });
+
+      await newCode.save();
     }
 
     // 更新戰鬥紀錄

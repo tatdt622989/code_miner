@@ -34,7 +34,7 @@ module.exports = {
     try {
       if (typeId === 'attack') {
         const response = await axios.post(`${process.env.API_URL}/game/worldBoss/attack`, { discordId });
-        const { bossAttack, userDamage, userDefense, isLastAttack, userMaxHp, user: newUser, userHpRecoveryTime, currentBoss, userWeapon } = response.data;
+        const { bossAttack, userDamage, userDefense, isLastAttack, userMaxHp, user: newUser, userHpRecoveryTime, currentBoss, userWeapon, isBossDead } = response.data;
 
         // 玩家血量
         const userHpUI = hpUI(parseInt(newUser.hp), userMaxHp);
@@ -44,7 +44,7 @@ module.exports = {
 
         const embed = new EmbedBuilder()
           .setTitle(`${user.data.name} 攻擊 [${currentBoss.qualityName}] ${currentBoss.worldBoss.name} LV.${currentBoss.worldBoss.difficulty}`)
-          .setDescription(`你的武器 - ** [${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level} ** \n\n 造成的傷害: **${userDamage}**\n防禦的傷害: **${userDefense}**\n\n世界首領對你造成的傷害: **${bossAttack}** \n\n 你的血量 \n${userHpUI} \n${userDeadMsg}`)
+          .setDescription(`你的武器 - ** [${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level} ** \n\n 造成的傷害: **${userDamage}**\n防禦的傷害: **${userDefense}**\n\n世界首領對你造成的傷害: **${bossAttack}**\n\n ${isBossDead ? '**世界首領已經死亡！\n**請到 個人資料 -> 領取世界首領獎勵 領取獎勵**\n\n' : ''} 你的血量 \n${userHpUI} \n${userDeadMsg}`)
           .setColor(user.data.color || 0x000000)
           .setTimestamp();
 

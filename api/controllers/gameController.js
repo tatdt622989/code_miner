@@ -146,7 +146,6 @@ exports.mine = async (req, res) => {
       const miningInterval = 6 * 1000; // 每6秒挖礦一次
       const mineDuration = autoMine.durationMinutes * 60 * 1000;
       const miningTimes = Math.floor(mineDuration / miningInterval);
-      console.log('miningTimes', miningTimes);
       for (let i = 0; i < miningTimes; i++) {
         const { minerals, exp, totalValue } = getMineReward(mine, tool);
         user.experience += exp;
@@ -156,8 +155,6 @@ exports.mine = async (req, res) => {
         autoMineTotalValue += totalValue;
       }
       user.potionEffect.autoMine.active = false;
-      console.log('exp', autoMineExp);
-      console.log('totalValue', autoMineTotalValue);
       // 重複礦物合併
       const mineralsMap = new Map();
       autoMineMinerals.forEach(m => {
@@ -453,7 +450,7 @@ exports.listWeapons = async (req, res) => {
     const weaponsWithUser = weapons.map(weapon => {
       const userWeapon = user.weapons.find(w => w.weapon.toString() === weapon.id);
       const isAvailable = isNextWeaponAvailable;
-      if (userWeapon && userWeapon.level <= 15 || !userWeapon) {
+      if (userWeapon && userWeapon.level < 15 || !userWeapon) {
         isNextWeaponAvailable = false;
       }
       console.log(userWeapon);
@@ -720,17 +717,22 @@ exports.buyPotion = async (req, res) => {
     }
 
     // 取得藥水效果
-    const {
-      petTriggerProbabilityDouble = {},
-      miningRewardDouble = {},
-      autoMine = {},
-    } = user.potionEffect && user.potionEffect.toObject() || {};
-    petTriggerProbabilityDouble.active = petTriggerProbabilityDouble.end > new Date();
-    miningRewardDouble.active = miningRewardDouble.end > new Date();
+    const potionEffects = user.potionEffect?.toObject() || {};
+    const effects = [
+      { key: 'petTriggerProbabilityDouble', index: 1 },
+      { key: 'miningRewardDouble', index: 2 },
+      { key: 'autoMine', index: 3 },
+      { key: 'worldBossAttackDouble', index: 4 },
+    ];
+    // 初始化 potionInfoCopy
     const potionInfoCopy = JSON.parse(JSON.stringify(potionInfo));
-    potionInfoCopy[1].active = petTriggerProbabilityDouble.active;
-    potionInfoCopy[2].active = miningRewardDouble.active;
-    potionInfoCopy[3].active = autoMine.active;
+
+    // 處理每個效果
+    effects.forEach(({ key, index }) => {
+      const effect = potionEffects[key] || {};
+      effect.active = effect.end > new Date(); // 判斷 active 狀態
+      potionInfoCopy[index].active = effect.active; // 更新 potionInfoCopy
+    });
 
     // 檢查是否在使用狀態
     if (potionInfoCopy[type].active) {
@@ -745,7 +747,11 @@ exports.buyPotion = async (req, res) => {
     user.magicalHerb -= potionPrice;
 
     // 檢查是否有藥水效果資料
-    if (!user.potionEffect) {
+    if (!user.potionEffect ||
+      !user.potionEffect.petTriggerProbabilityDouble ||
+      !user.potionEffect.miningRewardDouble ||
+      !user.potionEffect.autoMine ||
+      !user.potionEffect.worldBossAttackDouble) {
       user.potionEffect = {
         petTriggerProbabilityDouble: {
           durationMinutes: 0,
@@ -760,6 +766,10 @@ exports.buyPotion = async (req, res) => {
           durationMinutes: 0,
           end: new Date(0),
         },
+        worldBossAttackDouble: {
+          durationMinutes: 0,
+          end: new Date(0),
+        }
       }
     }
 
@@ -778,6 +788,10 @@ exports.buyPotion = async (req, res) => {
         user.potionEffect.autoMine.active = true;
         user.potionEffect.autoMine.durationMinutes = timeMap[timeId];
         user.potionEffect.autoMine.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
+        break;
+      case '4':
+        user.potionEffect.worldBossAttackDouble.durationMinutes = timeMap[timeId];
+        user.potionEffect.worldBossAttackDouble.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
         break;
     }
 
@@ -1084,11 +1098,17 @@ exports.openChest = async (req, res) => {
       newUserPrize.code = code;
       newUserPrize.command = prize.prize.command;
     }
-    await newUserPrize.save();
 
+    // 如果是強化寶珠，增加強化寶珠
+    if (prize.prize.type === 'pearl') {
+      user.pearl += prize.prize.value;
+      newUserPrize.value = prize.prize.value;
+    }
+
+    await newUserPrize.save();
     await user.save();
 
-    res.status(200).json({ prize, user, code });
+    res.status(200).json({ prize, user, code, prizeType: prize.prize.type });
 
   } catch (error) {
     console.log(error);
@@ -1166,7 +1186,7 @@ exports.attackBoss = async (req, res) => {
     const nowTs = Date.now();
 
     // 是否回補 HP，每半小時回補一次
-    const resetTime = user.lastAttackWorldBoss.getTime() + 30 * 60 * 1000;
+    const resetTime = user.lastAttackWorldBoss.getTime() + 5 * 60 * 1000;
     const userMaxHp = getUserLevelAndExperience(user).level > 1 ? getUserLevelAndExperience(user).level * 10 + 100 : 100;
     if (nowTs > resetTime) {
       user.hp = userMaxHp;
@@ -1174,7 +1194,7 @@ exports.attackBoss = async (req, res) => {
 
     // 檢查 HP 是否大於 0
     if (user.hp <= 0) {
-      return res.status(400).json({ error: `你太累了，休息一下吧！ \n (${Math.ceil((resetTime - nowTs) / 1000)}秒後可再次攻擊)` });
+      return res.status(400).json({ error: `你太累了，休息一下吧！ \n **${Math.ceil((resetTime - nowTs) / 1000)}** 秒後可再次攻擊` });
     }
 
     // 獲取世界首領
@@ -1192,12 +1212,17 @@ exports.attackBoss = async (req, res) => {
       currentBoss = await generateWorldBossRecord();
     }
 
+    // 取得秘法狂暴藥劑效果 (攻擊增加 1.5 倍)
+    const potionEffects = user.potionEffect?.toObject() || {};
+    const effect = potionEffects.worldBossAttackDouble || {};
+    effect.active = effect.end > new Date(); // 判斷 active 狀態
+
     // 玩家攻擊
     const userWeapon = user.weapons.find(w => w.weapon.id === user.equipped.weapon.toString());
     if (!userWeapon) {
       return res.status(404).json({ error: '找不到武器' });
     }
-    const userDamage = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max);
+    const userDamage = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max) * (effect.active ? 1.5 : 1);
     let isLastAttack = false;
     currentBoss.remainingHp = (currentBoss.remainingHp - userDamage).toFixed(2);
     if (currentBoss.remainingHp <= 0) {
@@ -1237,7 +1262,6 @@ exports.attackBoss = async (req, res) => {
     const isBossDead = currentBoss.remainingHp <= 0;
 
     // 如果世界首領死亡，生成新的世界首領
-    console.log('currentBoss', currentBoss);
     if (isBossDead) {
       currentBoss = await generateWorldBossRecord();
     }
@@ -1258,7 +1282,8 @@ exports.attackBoss = async (req, res) => {
       userWeapon: {
         ...userWeapon._doc,
         qualityName: getQualityName(userWeapon.quality),
-      }
+      },
+      isPotionActive: effect.active,
     });
   } catch (error) {
     console.log(error);
@@ -1499,7 +1524,7 @@ exports.claimWorldBossReward = async (req, res) => {
 }
 
 // 檢查當前強化的武器消耗的強化寶珠和品質升級套組
-exports.checkStrengthenWeaponCost = async (req, res) => {
+exports.checkStrengthenWeaponData = async (req, res) => {
   const { discordId, userWeaponId } = req.body;
 
   if (!discordId || !userWeaponId) {
@@ -1529,8 +1554,14 @@ exports.checkStrengthenWeaponCost = async (req, res) => {
     const qualityData = getQualityData(userWeapon.quality + 1);
 
     res.status(200).json({
-      pearl: strengthenData?.pearl || 0,
-      qualityUpgradeSet: qualityData?.qualityUpgradeSet || 0
+      cost: {
+        pearl: strengthenData?.pearl || 0,
+        qualityUpgradeSet: qualityData?.qualityUpgradeSet || 0
+      },
+      probability: {
+        pearl: strengthenData?.probability || 0,
+        qualityUpgradeSet: qualityData?.probability || 0
+      }
     });
 
   } catch (error) {

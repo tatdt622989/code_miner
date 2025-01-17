@@ -48,8 +48,7 @@ module.exports = {
       // 處理下拉選單回應
       if (interaction.isStringSelectMenu()) {
         const selectedWeaponId = optionValue && optionValue[0] || interaction.values[0];
-        const selectedWeapon = user.data.weapons.find(weapon => weapon.weapon === selectedWeaponId);
-        console.log('selectedWeapon', selectedWeapon);
+        const selectedWeapon = user.data.weapons.find(weapon => weapon.weapon._id === selectedWeaponId);
 
         if (selectedWeapon) {
           const req = {
@@ -61,7 +60,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
               .setTitle('更換武器成功')
-              .setDescription(`已裝備 <:${selectedWeapon.weapon.emojiName}:${selectedWeapon.weapon.emojiId}> **[${selectedWeapon.weapon.qualityName}] ${selectedWeapon.weapon.name} +${selectedWeapon.level}**\n\n攻擊: ${selectedWeapon.attack.min} ~ ${selectedWeapon.attack.max}\n防禦: ${selectedWeapon.defense.min} ~ ${selectedWeapon.defense.max}`)
+              .setDescription(`已裝備 <:${selectedWeapon.weapon.emojiName}:${selectedWeapon.weapon.emojiId}> **[${selectedWeapon.qualityName}] ${selectedWeapon.weapon.name} +${selectedWeapon.level}**\n\n攻擊: ${selectedWeapon.attack.min} ~ ${selectedWeapon.attack.max}\n防禦: ${selectedWeapon.defense.min} ~ ${selectedWeapon.defense.max}`)
               .setColor(user.data.color || 0x000000);
 
             const returnButton = new ButtonBuilder()
@@ -141,23 +140,23 @@ module.exports = {
     } catch (error) {
       console.error(error);
       let errorMessage = '發生錯誤，請稍後再試';
-      
+
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = `錯誤：${error.message}`;
       }
-      
+
       const errorEmbed = new EmbedBuilder()
         .setTitle('錯誤')
         .setDescription(errorMessage)
         .setColor(0xFF0000);
-      
-      const errorResponse = { 
+
+      const errorResponse = {
         embeds: [errorEmbed],
-        ephemeral: true 
+        ephemeral: true
       };
-      
+
       if (interaction.deferred) {
         await interaction.editReply(errorResponse);
       } else {

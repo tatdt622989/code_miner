@@ -55,7 +55,7 @@ module.exports = {
 
     let msg = `擁有的武器: \n\n`;
     user.data.weapons.forEach(userWeapon => {
-      msg += `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> ** [${userWeapon.qualityName}]** ${userWeapon.weapon.name} + ${userWeapon.level} / 攻擊力: ${userWeapon.attack.min} ~ ${userWeapon.attack.max} / 防禦力: ${userWeapon.defense.min} ~ ${userWeapon.defense.max}\n\n`;
+      msg += `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> ** [${userWeapon.qualityName}]** ${userWeapon.weapon.name} + ${userWeapon.level} \n 攻擊力: ${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 防禦力: ${userWeapon.defense.min} ~ ${userWeapon.defense.max}\n\n`;
     });
 
     const embed = new EmbedBuilder()

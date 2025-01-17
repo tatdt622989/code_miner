@@ -46,12 +46,15 @@ module.exports = {
       const openChest = await axios.post(`${process.env.API_URL}/game/lottery/open`, { discordId, chestId: itemId });
 
       const prize = openChest.data.prize.prize;
+      const prizeType = openChest.data.prizeType;
       let msg = '';
-      if (prize.command) {
+      if (prizeType === 'code') {
         const code = openChest.data.code;
         msg = `恭喜你獲得了 <:${prize.emojiName}:${prize.emojiId}> **${prize.name}** \n\n請到ReiSui伺服器中輸入\n\`\`\`/code ${code}\`\`\`\n兌換Minecraft獎品!`;
-      } else {
+      } else if (prizeType === 'coin') {
         msg = `恭喜你獲得了 <:${prize.emojiName}:${prize.emojiId}> **${prize.name}** \n\n 金幣 x **${prize.value}**`;
+      } else if (prizeType === 'pearl') {
+        msg = `恭喜你獲得了 <:${prize.emojiName}:${prize.emojiId}> **${prize.name}** \n\n 強化寶珠 x **${prize.value}**`;
       }
 
       const embed = new EmbedBuilder()

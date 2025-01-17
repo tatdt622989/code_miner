@@ -4,7 +4,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 module.exports = {
-  cooldown: 1,
+  cooldown: 0,
   data: new SlashCommandBuilder()
     .setName('strengthen-weapon')
     .setDescription('強化武器'),
@@ -57,26 +57,43 @@ module.exports = {
         const actionsRow = new ActionRowBuilder();
 
         const returnButton = new ButtonBuilder()
-          .setCustomId('weapon')
+          .setCustomId('strengthen-weapon')
           .setLabel('返回')
           .setStyle('Secondary');
         actionsRow.addComponents(returnButton);
 
-        await interaction.editReply({ embeds: [embed], components: [actionsRow] });
-      } else {
-        const embed = new EmbedBuilder()
-          .setColor(user.data.color || 0x000000)
-          .setTitle(`${user.data.name} 的武器強化`)
-          .setDescription(`擁有的強化寶珠: **${user.data.pearl || 0}** <:pearl:1325305628096462950> \n\n 強化武器： \n `);
-
-        const actionsRow = new ActionRowBuilder();
-
         // 取得消耗素材
-        const strengthenCostRes = await axios.post(`${process.env.API_URL}/game/checkStrengthenWeaponCost`, {
+        const strengthenCostRes = await axios.post(`${process.env.API_URL}/game/checkStrengthenWeaponData`, {
           discordId,
           userWeaponId: weapon._id
         });
-        const strengthenPearl = strengthenCostRes.data.pearl;
+        const strengthenPearl = strengthenCostRes.data?.cost?.pearl;
+
+        // 強化按鈕
+        const strengthenButton = new ButtonBuilder()
+          .setCustomId(`strengthen-weapon_${user.data._id}`)
+          .setLabel(`強化${weapon.weapon.name} (消耗 ${strengthenPearl})`)
+          .setEmoji('1325305628096462950')
+          .setStyle('Primary');
+        actionsRow.addComponents(strengthenButton);
+
+        await interaction.editReply({ embeds: [embed], components: [actionsRow] });
+      } else {
+        // 取得消耗素材
+        const strengthenCostRes = await axios.post(`${process.env.API_URL}/game/checkStrengthenWeaponData`, {
+          discordId,
+          userWeaponId: weapon._id
+        });
+        const strengthenPearl = strengthenCostRes.data?.cost?.pearl || 0;
+        const strengthenProbability = strengthenCostRes?.data?.probability?.pearl || 0;
+        const strengthenPercent = strengthenProbability * 100;
+
+        const embed = new EmbedBuilder()
+          .setColor(user.data.color || 0x000000)
+          .setTitle(`${user.data.name} 的武器強化`)
+          .setDescription(`擁有的強化寶珠: **${user.data.pearl || 0}** <:pearl:1325305628096462950> \n\n 強化機率: **${strengthenPercent}%** \n\n 強化武器： \n `);
+
+        const actionsRow = new ActionRowBuilder();;
 
         // 強化按鈕
         const strengthenButton = new ButtonBuilder()

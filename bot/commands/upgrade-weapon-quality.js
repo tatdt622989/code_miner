@@ -4,7 +4,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 module.exports = {
-  cooldown: 1,
+  cooldown: 0,
   data: new SlashCommandBuilder()
     .setName('upgrade-weapon-quality')
     .setDescription('升級武器品質'),
@@ -56,26 +56,43 @@ module.exports = {
         const actionsRow = new ActionRowBuilder();
 
         const returnButton = new ButtonBuilder()
-          .setCustomId('weapon')
+          .setCustomId('upgrade-weapon-quality')
           .setLabel('返回')
           .setStyle('Secondary');
         actionsRow.addComponents(returnButton);
 
-        await interaction.editReply({ embeds: [embed], components: [actionsRow] });
-      } else {
-        const embed = new EmbedBuilder()
-          .setColor(user.data.color || 0x000000)
-          .setTitle(`${user.data.name} 的武器品質升級`)
-          .setDescription(`擁有的強化升級模組: **${user.data.qualityUpgradeSet || 0}** <:quality_set:1325383804113649734> \n\n 品質升級武器： \n `);
-
-        const actionsRow = new ActionRowBuilder();
-
         // 取得消耗素材
-        const costRes = await axios.post(`${process.env.API_URL}/game/checkStrengthenWeaponCost`, {
+        const costRes = await axios.post(`${process.env.API_URL}/game/checkStrengthenWeaponData`, {
           discordId,
           userWeaponId: weapon._id
         });
-        const qualityUpgradeSet = costRes.data.qualityUpgradeSet;
+        const qualityUpgradeSet = costRes.data?.cost?.qualityUpgradeSet || 0;
+
+        // 強化按鈕
+        const strengthenButton = new ButtonBuilder()
+          .setCustomId(`upgrade-weapon-quality_${user.data._id}`)
+          .setLabel(`升級${weapon.weapon.name} (消耗 ${qualityUpgradeSet})`)
+          .setEmoji('1325383804113649734')
+          .setStyle('Primary');
+        actionsRow.addComponents(strengthenButton);
+
+        await interaction.editReply({ embeds: [embed], components: [actionsRow] });
+      } else {
+        // 取得消耗素材
+        const costRes = await axios.post(`${process.env.API_URL}/game/checkStrengthenWeaponData`, {
+          discordId,
+          userWeaponId: weapon._id
+        });
+        const qualityUpgradeSet = costRes.data?.cost?.qualityUpgradeSet || 0;
+        const qualityProbability = costRes.data?.probability?.qualityUpgradeSet || 0;
+        const qualityPercent = qualityProbability * 100;
+
+        const embed = new EmbedBuilder()
+          .setColor(user.data.color || 0x000000)
+          .setTitle(`${user.data.name} 的武器品質升級`)
+          .setDescription(`擁有的強化升級模組: **${user.data.qualityUpgradeSet || 0}** <:quality_set:1325383804113649734> \n\n 強化機率: **${qualityPercent}%** \n\n 品質升級武器： \n `);
+
+        const actionsRow = new ActionRowBuilder();
 
         // 強化按鈕
         const strengthenButton = new ButtonBuilder()

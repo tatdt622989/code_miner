@@ -31,10 +31,14 @@ module.exports = {
       return interaction.editReply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
     }
 
+    const actionRow = new ActionRowBuilder();
     try {
       if (typeId === 'attack') {
         const response = await axios.post(`${process.env.API_URL}/game/worldBoss/attack`, { discordId });
         const { bossAttack, userDamage, userDefense, isLastAttack, userMaxHp, user: newUser, userHpRecoveryTime, currentBoss, userWeapon, isBossDead } = response.data;
+
+        // 世界首領血量
+        const bossHpUI = hpUI(currentBoss.remainingHp, currentBoss.hp);
 
         // 玩家血量
         const userHpUI = hpUI(parseInt(newUser.hp), userMaxHp);
@@ -42,13 +46,18 @@ module.exports = {
         // 玩家是否死亡
         const userDeadMsg = newUser.hp <= 0 ? `你已經死亡，請等待 ${userHpRecoveryTime} 秒後重生` : '';
 
+        // 玩家是否為最後一次攻擊
+        const isLastAttackMsg = isLastAttack ? '**你是最後一次攻擊！將獲得額外一個隨機獎勵！**' : '';
+
+        // 世界首領是否死亡
+        const isBossDeadMsg = isBossDead ? '**世界首領已經死亡！\n**請到 個人資料 -> 領取世界首領獎勵 領取獎勵**\n\n' : '';
+
         const embed = new EmbedBuilder()
           .setTitle(`${user.data.name} 攻擊 [${currentBoss.qualityName}] ${currentBoss.worldBoss.name} LV.${currentBoss.worldBoss.difficulty}`)
-          .setDescription(`你的武器 - ** [${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level} ** \n\n 造成的傷害: **${userDamage}**\n防禦的傷害: **${userDefense}**\n\n世界首領對你造成的傷害: **${bossAttack}**\n\n ${isBossDead ? '**世界首領已經死亡！\n**請到 個人資料 -> 領取世界首領獎勵 領取獎勵**\n\n' : ''} 你的血量 \n${userHpUI} \n${userDeadMsg}`)
+          .setDescription(`你的武器 - ** [${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level} ** \n\n 造成的傷害: **${userDamage}**\n防禦的傷害: **${userDefense}**\n\n世界首領對你造成的傷害: **${bossAttack}**\n\n ${isLastAttackMsg} \n ${isBossDeadMsg} 你的血量 \n${userHpUI} \n${userDeadMsg} \n\n世界首領血量 \n${bossHpUI}`)
           .setColor(user.data.color || 0x000000)
           .setTimestamp();
 
-        const actionRow = new ActionRowBuilder();
         if (!isLastAttack) {
           const attackBossButton = new ButtonBuilder()
             .setCustomId('world-boss_attack')
@@ -170,13 +179,19 @@ module.exports = {
         await interaction.editReply({ embeds: [embed], components: [actionRow], ephemeral: true });
       }
     } catch (error) {
-      console.error(error);
+      // 返回世界首領
+      const returnBossButton = new ButtonBuilder()
+        .setCustomId('world-boss')
+        .setEmoji('1325337103164506154')
+        .setLabel('返回世界首領')
+        .setStyle('Primary');
+      actionRow.addComponents(returnBossButton);
       const embed = new EmbedBuilder()
-        .setTitle('發生錯誤')
-        .setDescription(error.message)
+        .setTitle('無法攻擊世界首領')
+        .setDescription(error?.response?.data?.error || error.message)
         .setColor(0x000000)
         .setTimestamp();
-      return interaction.editReply({ embeds: [embed], ephemeral: true });
+      return interaction.editReply({ embeds: [embed], components: [actionRow], ephemeral: true });
     }
   }
 };

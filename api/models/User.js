@@ -57,17 +57,7 @@ const equippedSchema = new mongoose.Schema({
 });
 
 // 藥水效果
-const petTriggerProbabilityDoubleSchema = new mongoose.Schema({
-  durationMinutes: {
-    type: Number,
-    default: 0,
-  },
-  end: {
-    type: Date,
-    default: new Date(0),
-  },
-});
-const miningRewardDoubleSchema = new mongoose.Schema({
+const potionEffectDetailsSchema = new mongoose.Schema({
   durationMinutes: {
     type: Number,
     default: 0,
@@ -92,15 +82,10 @@ const autoMineSchema = new mongoose.Schema({
   },
 });
 const potionEffectSchema = new mongoose.Schema({
-  petTriggerProbabilityDouble: {
-    type: petTriggerProbabilityDoubleSchema,
-  },
-  miningRewardDouble: {
-    type: miningRewardDoubleSchema,
-  },
-  autoMine: {
-    type: autoMineSchema,
-  },
+  petTriggerProbabilityDouble: potionEffectDetailsSchema,
+  miningRewardDouble: potionEffectDetailsSchema,
+  autoMine: autoMineSchema,
+  worldBossAttackDouble: potionEffectDetailsSchema,
 });
 
 // 玩家

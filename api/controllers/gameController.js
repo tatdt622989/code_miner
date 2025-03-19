@@ -5,7 +5,7 @@ const { User, UserPrize } = require('../models/User');
 // utils
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
 const { getRandomInt, getRandomItem, getRandomFloat } = require('../utils/randomUtil');
-const { getStrengthenData, getQualityData, getWeaponData, getQualityName } = require('../utils/weaponUtil');
+const { getStrengthenData, getQualityData, getWeaponData, getQualityName, getWeaponRequirements } = require('../utils/weaponUtil');
 const { potionInfo, timeMap } = require('../utils/potionInfo'); // 藥水資訊
 
 function codeGenerator(length) {
@@ -59,10 +59,50 @@ function getMineReward(mine, tool, miningRewardDouble = {}) {
 
 async function generateWorldBossRecord() {
   const allWorldBosses = await WorldBoss.find({}).sort({ level: -1 });
-  const randomBoss = allWorldBosses[getRandomInt(0, allWorldBosses.length - 1)];
-  const quality = getRandomInt(1, 6);
-  const hpTimes = [1, 5, 15, 30, 100, 320][quality - 1];
-  const attackTimes = [1, 3, 5, 7, 9, 15][quality - 1];
+  const bossWeight = {
+    1: 70,
+    2: 14,
+    3: 8,
+    4: 5,
+    5: 2,
+    6: 1
+  }
+  let randomNum = getRandomInt(1, 100);
+  let accumulatedWeight = 0;
+  let bossDifficulty = null;
+  for (const key in bossWeight) {
+    accumulatedWeight += bossWeight[key];
+    if (randomNum <= accumulatedWeight) {
+      bossDifficulty = key;
+      break;
+    }
+  }
+  const randomBoss = allWorldBosses.find(b => b.difficulty === Number(bossDifficulty));
+  console.log('randomBoss', randomBoss);
+
+  const qualityWeight = {
+    1: 70,
+    2: 14,
+    3: 8,
+    4: 5,
+    5: 2,
+    6: 1
+  };
+  randomNum = getRandomInt(1, 100);
+  console.log('randomNum', randomNum);
+  accumulatedWeight = 0;
+  let bossQuality = null;
+  for (const key in qualityWeight) {
+    accumulatedWeight += qualityWeight[key];
+    if (randomNum <= accumulatedWeight) {
+      bossQuality = key;
+      break;
+    }
+  }
+  console.log('difficulty', bossDifficulty, 'quality', bossQuality);
+  const hpTimes = [1, 15, 35, 75, 150, 750][bossQuality - 1];
+  const attackTimes = [1, 10, 20, 40, 80, 150][bossQuality - 1];
+  console.log('hpTimes', hpTimes, 'attackTimes', attackTimes);
   const newBoss = new WorldBossRecord({
     worldBoss: randomBoss.id,
     hp: randomBoss.baseHp * hpTimes,
@@ -71,7 +111,7 @@ async function generateWorldBossRecord() {
       min: randomBoss.basicAttack.min * attackTimes,
       max: randomBoss.basicAttack.max * attackTimes,
     },
-    quality,
+    quality: bossQuality
   });
   await newBoss.save();
   return await WorldBossRecord.findOne({}).populate('worldBoss').sort({ createdAt: -1 });
@@ -447,18 +487,26 @@ exports.listWeapons = async (req, res) => {
     // 玩家已擁有的武器
     const user = await User.findOne({ discordId }).populate('weapons').sort({ price: 1 });
     let isNextWeaponAvailable = true;
-    const weaponsWithUser = weapons.map(weapon => {
-      const userWeapon = user.weapons.find(w => w.weapon.toString() === weapon.id);
+    const weaponsWithUser = weapons.map((weapon, index) => {
+      const currentUserWeapon = user?.weapons.find(w => w.weapon.toString() === weapon.id);
+      // 目前的武器需要符合下一個武器的要求才能獲得(第一個武器不需要)
+      const { strengthen, quality } = getWeaponRequirements(index + 1) || { strengthen: 0, quality: 0 };
       const isAvailable = isNextWeaponAvailable;
-      if (userWeapon && userWeapon.level < 15 || !userWeapon) {
+      if (!currentUserWeapon || currentUserWeapon.level < strengthen || currentUserWeapon.quality < quality) {
         isNextWeaponAvailable = false;
+      } else {
+        isNextWeaponAvailable = true;
       }
-      console.log(userWeapon);
+      console.log(currentUserWeapon, strengthen, quality, isNextWeaponAvailable);
       return {
         ...weapon._doc,
-        owned: !!userWeapon,
+        owned: !!currentUserWeapon,
         isAvailable,
-        qualityName: userWeapon && getQualityName(userWeapon.quality) || '未知',
+        qualityName: currentUserWeapon && getQualityName(currentUserWeapon.quality) || '未知',
+        buyNextWeaponRequirement: strengthen > 0 ? {
+          strengthen: strengthen,
+          quality: getQualityName(quality)
+        } : null
       }
     });
     res.status(200).json(weaponsWithUser);
@@ -482,10 +530,11 @@ exports.listWorldBosses = async (req, res) => {
 // 出現中的世界首領
 exports.getCurrentWorldBoss = async (req, res) => {
   try {
-    const currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 }).populate('worldBoss');
+    let currentBoss = await WorldBossRecord.findOne({}).sort({ createdAt: -1 }).populate('worldBoss');
     const expireTime = currentBoss.createdAt.getTime() + currentBoss.quality * 24 * 60 * 60 * 1000;
-    if (expireTime < Date.now()) {
+    if (expireTime < Date.now() || currentBoss.remainingHp <= 0) {
       const newBoss = await generateWorldBossRecord();
+      currentBoss = newBoss;
       return res.status(200).json({
         ...newBoss._doc,
         expireTime: newBoss.createdAt.getTime() + newBoss.quality * 24 * 60 * 60 * 1000,
@@ -723,6 +772,7 @@ exports.buyPotion = async (req, res) => {
       { key: 'miningRewardDouble', index: 2 },
       { key: 'autoMine', index: 3 },
       { key: 'worldBossAttackDouble', index: 4 },
+      { key: 'defenseDouble', index: 5 }
     ];
     // 初始化 potionInfoCopy
     const potionInfoCopy = JSON.parse(JSON.stringify(potionInfo));
@@ -751,7 +801,8 @@ exports.buyPotion = async (req, res) => {
       !user.potionEffect.petTriggerProbabilityDouble ||
       !user.potionEffect.miningRewardDouble ||
       !user.potionEffect.autoMine ||
-      !user.potionEffect.worldBossAttackDouble) {
+      !user.potionEffect.worldBossAttackDouble ||
+      !user.potionEffect.defenseDouble) {
       user.potionEffect = {
         petTriggerProbabilityDouble: {
           durationMinutes: 0,
@@ -767,6 +818,10 @@ exports.buyPotion = async (req, res) => {
           end: new Date(0),
         },
         worldBossAttackDouble: {
+          durationMinutes: 0,
+          end: new Date(0),
+        },
+        defenseDouble: {
           durationMinutes: 0,
           end: new Date(0),
         }
@@ -792,6 +847,10 @@ exports.buyPotion = async (req, res) => {
       case '4':
         user.potionEffect.worldBossAttackDouble.durationMinutes = timeMap[timeId];
         user.potionEffect.worldBossAttackDouble.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
+        break;
+      case '5':
+        user.potionEffect.defenseDouble.durationMinutes = timeMap[timeId];
+        user.potionEffect.defenseDouble.end = new Date(now.getTime() + timeMap[timeId] * 60 * 1000);
         break;
     }
 
@@ -829,7 +888,7 @@ exports.buyWeapon = async (req, res) => {
       return res.status(400).json({ error: '貨幣不足' });
     }
 
-    const isWeaponOwned = user.weapons.some(w => {
+    const isWeaponOwned = user?.weapons.some(w => {
       const id = w.weapon.toString();
       return id === weapon.id;
     });
@@ -839,13 +898,16 @@ exports.buyWeapon = async (req, res) => {
 
     const cheaperWeapon = weapons.find(w => w.price < weapon.price);
     if (cheaperWeapon) {
-      const userCheaperWeapon = user.weapons.find(w => w.id === cheaperWeapon.id);
+      const userCheaperWeapon = user?.weapons.find(w => w.id === cheaperWeapon.id);
       if (userCheaperWeapon && userCheaperWeapon.level < 15) {
         return res.status(400).json({ error: `強化等級不足，請先強化 ${cheaperWeapon.name} 到 +15` });
       }
     }
 
     user.currency -= weapon.price;
+    if (!user.weapons) {
+      user.weapons = [];
+    }
     user.weapons.push({
       weapon: weapon.id,
       level: 0,
@@ -926,7 +988,7 @@ exports.strengthenWeapon = async (req, res) => {
       return res.status(404).json({ error: '找不到使用者' });
     }
 
-    const userWeapon = user.weapons.find(w => w.id === userWeaponId);
+    const userWeapon = user?.weapons.find(w => w.id === userWeaponId);
     if (!userWeapon) {
       return res.status(404).json({ error: '找不到武器' });
     }
@@ -946,16 +1008,27 @@ exports.strengthenWeapon = async (req, res) => {
     const isSuccess = getRandomInt(0, 999) < strengthenData.probability * 1000;
     if (isSuccess) {
       userWeapon.level = nextLevel;
-      ['min', 'max'].forEach(attr => {
-        userWeapon.attack[attr] = (userWeapon.attack[attr] * strengthenData.increase).toFixed(2);
-        userWeapon.defense[attr] = (userWeapon.defense[attr] * strengthenData.increase).toFixed(2);
-      });
-      console.log('強化成功', userWeapon.weapon.name, userWeapon.level, user._id);
+      const newWeaponData = await getWeaponData(userWeapon.weapon.id, userWeapon.quality, userWeapon.level);
+      if (!newWeaponData) {
+        console.log(user.name, userWeapon);
+        return res.status(400).json({ error: '武器數據取得失敗' });
+      }
+      userWeapon.attack = newWeaponData.attack;
+      userWeapon.defense = newWeaponData.defense;
+      console.log('強化成功', userWeapon.weapon.name, userWeapon.level, user._id, userWeapon.weapon.id);
       res.status(200).json({
         success: true,
         message: `成功強化 ${userWeapon.weapon.name} 到 **+${userWeapon.level}** 等級！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}`
       });
     } else {
+      // 更新武器資訊
+      console.log('強化失敗', userWeapon.weapon.id);
+      const updatedWeapon = await getWeaponData(userWeapon.weapon.id, userWeapon.quality, userWeapon.level);
+      if (!updatedWeapon) {
+        return res.status(400).json({ error: '武器數據取得失敗' });
+      }
+      userWeapon.attack = updatedWeapon.attack;
+      userWeapon.defense = updatedWeapon.defense;
       res.status(200).json({
         success: false,
         message: `強化失敗！`
@@ -990,7 +1063,7 @@ exports.upgradeWeaponQuality = async (req, res) => {
       return res.status(404).json({ error: '找不到使用者' });
     }
 
-    const userWeapon = user.weapons.find(w => w.id === userWeaponId);
+    const userWeapon = user?.weapons.find(w => w.id === userWeaponId);
     if (!userWeapon) {
       return res.status(404).json({ error: '找不到武器' });
     }
@@ -1013,7 +1086,6 @@ exports.upgradeWeaponQuality = async (req, res) => {
       const { attack, defense } = await getWeaponData(userWeapon.weapon.id, userWeapon.quality, userWeapon.level)
       userWeapon.attack = attack;
       userWeapon.defense = defense;
-      await user.save();
       console.log('提升品質成功', userWeapon.weapon.name, userWeapon.quality, user._id);
       res.status(200).json({
         message: `成功提升 ${userWeapon.weapon.name} 到 **${getQualityName(userWeapon.quality)}** 品質！ \n 新的攻擊力:${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 新的防禦力:${userWeapon.defense.min} ~ ${userWeapon.defense.max}`,
@@ -1026,6 +1098,7 @@ exports.upgradeWeaponQuality = async (req, res) => {
         success: false
       });
     }
+    await user.save();
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法提升武器品質' });
@@ -1183,9 +1256,44 @@ exports.attackBoss = async (req, res) => {
       return res.status(400).json({ error: '請先到 **個人資料 -> 武器 -> 裝備武器** 裝備武器' });
     }
 
-    const nowTs = Date.now();
+    if (!user.weapons.length) {
+      return res.status(400).json({ error: '請先商店購買武器' });
+    }
+
+    // 將使用者的武器依為價格排序
+    user.weapons = user.weapons.sort((a, b) => a.weapon.price - b.weapon.price);
+
+    // 取得玩家裝備的武器
+    const userWeaponPriceIndex = user?.weapons.findIndex(w => w.weapon.id === user.equipped.weapon.toString());
+    const userWeapon = user?.weapons[userWeaponPriceIndex];
+    console.log(`玩家${discordId}裝備中武器`, userWeapon?.id.toString());
+    if (!userWeapon || userWeaponPriceIndex === -1) {
+      return res.status(404).json({ error: '找不到武器' });
+    }
+
+    // 取得玩家裝備中的上一個級別的武器
+    const previousWeaponIndex = userWeaponPriceIndex - 1;
+    const previousWeapon = user.weapons[previousWeaponIndex];
+    if (!previousWeapon && userWeaponPriceIndex > 0) {
+      return res.status(400).json({ error: '你需要先擁有上一級的武器' });
+    }
+
+    // 檢查是否可以使用奘備中的武器
+    if (previousWeapon) {
+      const { strengthen, quality } = getWeaponRequirements(userWeaponPriceIndex) || {};
+      if (!quality || !strengthen) {
+        return res.status(400).json({ error: '找不到此武器的需求' });
+      }
+      if (previousWeapon.quality < quality) {
+        return res.status(400).json({ error: `無法使用此武器，請先將 ${previousWeapon.name} 強化至 ${getQualityName(quality)} 品質` })
+      }
+      if (previousWeapon.level < strengthen) {
+        return res.status(400).json({ error: `無法使用此武器，請先將 ${previousWeapon.weapon.name} 強化至 + ${strengthen}` })
+      }
+    }
 
     // 是否回補 HP，每半小時回補一次
+    const nowTs = Date.now();
     const resetTime = user.lastAttackWorldBoss.getTime() + 5 * 60 * 1000;
     const userMaxHp = getUserLevelAndExperience(user).level > 1 ? getUserLevelAndExperience(user).level * 10 + 100 : 100;
     if (nowTs > resetTime) {
@@ -1214,15 +1322,15 @@ exports.attackBoss = async (req, res) => {
 
     // 取得秘法狂暴藥劑效果 (攻擊增加 1.5 倍)
     const potionEffects = user.potionEffect?.toObject() || {};
-    const effect = potionEffects.worldBossAttackDouble || {};
-    effect.active = effect.end > new Date(); // 判斷 active 狀態
+    const attackEffect = potionEffects.worldBossAttackDouble || {};
+    attackEffect.active = attackEffect.end > new Date(); // 判斷 active 狀態
+
+    // 取得防禦藥水效果 (防禦增加 1.5 倍)
+    const defenseEffect = potionEffects.defenseDouble || {};
+    defenseEffect.active = defenseEffect.end > new Date(); // 判斷 active 狀態
 
     // 玩家攻擊
-    const userWeapon = user.weapons.find(w => w.weapon.id === user.equipped.weapon.toString());
-    if (!userWeapon) {
-      return res.status(404).json({ error: '找不到武器' });
-    }
-    const userDamage = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max) * (effect.active ? 1.5 : 1);
+    const userDamage = getRandomFloat(userWeapon.attack.min, userWeapon.attack.max) * (attackEffect.active ? 1.5 : 1);
     let isLastAttack = false;
     currentBoss.remainingHp = (currentBoss.remainingHp - userDamage).toFixed(2);
     if (currentBoss.remainingHp <= 0) {
@@ -1232,7 +1340,7 @@ exports.attackBoss = async (req, res) => {
     user.lastAttackWorldBoss = nowTs;
 
     // 世界首領攻擊
-    const userDefense = getRandomFloat(userWeapon.defense.min, userWeapon.defense.max);
+    const userDefense = (getRandomFloat(userWeapon.defense.min, userWeapon.defense.max) * (defenseEffect.active ? 1.5 : 1)).toFixed(2);
     const bossAttack = Math.max(0, (getRandomFloat(currentBoss.attack.min, currentBoss.attack.max) - userDefense).toFixed(2));
     if (bossAttack > user.hp) {
       user.hp = 0;
@@ -1262,17 +1370,22 @@ exports.attackBoss = async (req, res) => {
     const isBossDead = currentBoss.remainingHp <= 0;
 
     // 如果世界首領死亡，生成新的世界首領
+    let newBoss = null;
     if (isBossDead) {
-      currentBoss = await generateWorldBossRecord();
+      newBoss = await generateWorldBossRecord();
     }
 
     res.status(200).json({
       bossAttack,
       userDamage,
       userDefense,
-      userHpRecoveryTime: Math.ceil((resetTime - nowTs) / 1000),
+      userHpRecoveryTime: user.hp <= 0 ? 5 * 60 : 0,
       isLastAttack,
       isBossDead,
+      newBoss: newBoss ? {
+        ...newBoss._doc,
+        qualityName: getQualityName(newBoss.quality),
+      } : null,
       currentBoss: {
         ...currentBoss._doc,
         qualityName: getQualityName(currentBoss.quality),
@@ -1283,7 +1396,8 @@ exports.attackBoss = async (req, res) => {
         ...userWeapon._doc,
         qualityName: getQualityName(userWeapon.quality),
       },
-      isPotionActive: effect.active,
+      isAttackPotionActive: attackEffect.active,
+      isDefensePotionActive: defenseEffect.active,
     });
   } catch (error) {
     console.log(error);
@@ -1307,6 +1421,7 @@ exports.checkWorldBossReward = async (req, res) => {
 
     const worldBoss = await WorldBossRecord.findOne({
       'participatingUsers.user': user.id,
+      'participatingUsers.isClaimed': false,
       remainingHp: { $lte: 0 },
     }).populate('worldBoss').sort({ createdAt: -1 });
     if (!worldBoss) {
@@ -1314,6 +1429,7 @@ exports.checkWorldBossReward = async (req, res) => {
     }
 
     const userRecord = worldBoss.participatingUsers.find(p => p.user.toString() === user.id);
+
     if (!userRecord) {
       return res.status(200).json({ hasReward: false });
     }
@@ -1345,9 +1461,10 @@ exports.claimWorldBossReward = async (req, res) => {
 
     const worldBoss = await WorldBossRecord.findOne({
       'participatingUsers.user': user.id,
+      'participatingUsers.isClaimed': false,
       remainingHp: { $lte: 0 },
     }).populate('worldBoss').sort({ createdAt: -1 });
-    if (!worldBoss) {
+    if (worldBoss.length === 0) {
       return res.status(404).json({ error: '找不到世界首領' });
     }
 
@@ -1543,7 +1660,7 @@ exports.checkStrengthenWeaponData = async (req, res) => {
       return res.status(404).json({ error: '找不到使用者' });
     }
 
-    const userWeapon = user.weapons.find(w => {
+    const userWeapon = user?.weapons.find(w => {
       return w.id === userWeaponId
     });
     if (!userWeapon) {

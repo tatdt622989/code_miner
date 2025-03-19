@@ -2,6 +2,7 @@ const { User } = require('../models/User');
 
 const { getUserLevelAndExperience } = require('../utils/levelExperienceHandler');
 const { getQualityName } = require('../utils/weaponUtil');
+const crypto = require('crypto');
 
 const levelColorMap = {
   0: 0xB0B0B0,      // 普通等級 (灰色)
@@ -100,10 +101,10 @@ exports.getUser = async (req, res) => {
     res.status(200).json({
       ...user._doc,
       level: levelData.level,
-      weapons: user.weapons.map(w => ({
+      weapons: user?.weapons.map(w => ({
         ...w._doc,
         qualityName: getQualityName(w.quality)
-      })),
+      })) || [],
       color,
     });
   } catch (error) {
@@ -123,5 +124,47 @@ exports.getUserLevelAndExperience = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: '無法獲取用戶等級和經驗' });
+  }
+};
+
+// 檢查用戶圖片hash是否更新
+exports.checkImageUpdate = async (req, res) => {
+  const { discordId } = req.params;
+
+  try {
+    const user = await User.findOne({ discordId }).populate({
+      path: 'weapons',
+      populate: {
+        path: 'weapon',
+        model: 'Weapon',
+      }
+    })
+    if (!user) {
+      return res.status(404).json({ error: '找不到使用者' });
+    }
+
+    const equippedWeapon = user?.weapons.find(w => w.weapon._id.toString() === user.equipped?.weapon?.toString());
+
+    const hashData = {
+      userId: user._id,
+      equipped: user.equipped._doc,
+      equippedWeapon: equippedWeapon?._doc || null,
+    }
+
+    const hash = crypto.createHash('sha256');
+    hash.update(JSON.stringify(hashData));
+    const hashed = hash.digest('hex');
+
+    if (user.infoPictureHash !== hashed) {
+      user.infoPictureHash = hashed;
+      await user.save();
+      res.status(200).json({ needUpdate: true, hash: hashed });
+    } else {
+      res.status(200).json({ needUpdate: false, hash: hashed });
+    }
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: '無法獲取使用者' });
   }
 };

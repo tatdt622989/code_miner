@@ -54,9 +54,11 @@ module.exports = {
     actionRow.addComponents(returnButton);
 
     let msg = `擁有的武器: \n\n`;
-    user.data.weapons.forEach(userWeapon => {
-      msg += `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> ** [${userWeapon.qualityName}]** ${userWeapon.weapon.name} + ${userWeapon.level} \n 攻擊力: ${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 防禦力: ${userWeapon.defense.min} ~ ${userWeapon.defense.max}\n\n`;
-    });
+    if (user.data.weapons && user.data.weapons.length > 0) {      
+      user.data.weapons.forEach(userWeapon => {
+        msg += `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> ** [${userWeapon.qualityName}]** ${userWeapon.weapon.name} + ${userWeapon.level} \n 攻擊力: ${userWeapon.attack.min} ~ ${userWeapon.attack.max} \n 防禦力: ${userWeapon.defense.min} ~ ${userWeapon.defense.max}\n\n`;
+      });
+    }
 
     const embed = new EmbedBuilder()
       .setTitle(`${user.data.name} 的武器一覽`)

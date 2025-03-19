@@ -74,7 +74,8 @@ module.exports = {
 
       const actionRow = new ActionRowBuilder().addComponents(returnButton, tryAgainButton);
 
-      await interaction.editReply({
+      await interaction.deleteReply();
+      await interaction.followUp({
         embeds: [embed],
         components: [actionRow],
         ephemeral: true,

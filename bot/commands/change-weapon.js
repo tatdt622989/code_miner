@@ -4,6 +4,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 module.exports = {
+  cooldown: 0,
   data: new SlashCommandBuilder()
     .setName('change-weapon')
     .setDescription('更換裝備武器'),
@@ -28,7 +29,7 @@ module.exports = {
       if (!user.data.weapons || user.data.weapons.length === 0) {
         const embed = new EmbedBuilder()
           .setTitle('無法更換武器')
-          .setDescription('你還沒有任何武器！\n可以使用 `/buy weapon` 購買武器')
+          .setDescription('你還沒有任何武器！\n 可以使用到商店購買武器')
           .setColor(0xFF0000);
 
         // 返回按鈕
@@ -48,7 +49,7 @@ module.exports = {
       // 處理下拉選單回應
       if (interaction.isStringSelectMenu()) {
         const selectedWeaponId = optionValue && optionValue[0] || interaction.values[0];
-        const selectedWeapon = user.data.weapons.find(weapon => weapon.weapon._id === selectedWeaponId);
+        const selectedWeapon = user.data?.weapons.find(weapon => weapon.weapon._id === selectedWeaponId);
 
         if (selectedWeapon) {
           const req = {
@@ -99,19 +100,21 @@ module.exports = {
         .setPlaceholder('選擇要裝備的武器');
 
       // 添加武器選項
-      user.data.weapons.forEach(userWeapon => {
-        const isCurrentlyEquipped = user.data.equipped?.weapon === userWeapon.weapon._id;
-        selectMenu.addOptions({
-          label: `${isCurrentlyEquipped ? '(裝備中) ' : ''}[${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level}`,
-          description: `攻擊力: ${userWeapon.attack.min} ~ ${userWeapon.attack.max} / 防禦力: ${userWeapon.defense.min} ~ ${userWeapon.defense.max}`,
-          value: `change-weapon_${userWeapon.weapon._id}`,
-          emoji: {
-            name: userWeapon.weapon.emojiName,
-            id: userWeapon.weapon.emojiId
-          },
-          default: isCurrentlyEquipped
+      if (user.data?.weapons && user.data.weapons.length > 0) {
+        user.data?.weapons.forEach(userWeapon => {
+          const isCurrentlyEquipped = user.data.equipped?.weapon === userWeapon.weapon._id;
+          selectMenu.addOptions({
+            label: `${isCurrentlyEquipped ? '(裝備中) ' : ''}[${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level}`,
+            description: `攻擊力: ${userWeapon.attack.min} ~ ${userWeapon.attack.max} / 防禦力: ${userWeapon.defense.min} ~ ${userWeapon.defense.max}`,
+            value: `change-weapon_${userWeapon.weapon._id}`,
+            emoji: {
+              name: userWeapon.weapon.emojiName,
+              id: userWeapon.weapon.emojiId
+            },
+            default: isCurrentlyEquipped
+          });
         });
-      });
+      }
 
       const returnButton = new ButtonBuilder()
         .setCustomId('weapon')

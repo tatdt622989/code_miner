@@ -4,7 +4,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 module.exports = {
-  cooldown: 1,
+  cooldown: 2,
   data: new SlashCommandBuilder()
     .setName('world-boss')
     .setDescription('世界首領'),
@@ -35,26 +35,40 @@ module.exports = {
     try {
       if (typeId === 'attack') {
         const response = await axios.post(`${process.env.API_URL}/game/worldBoss/attack`, { discordId });
-        const { bossAttack, userDamage, userDefense, isLastAttack, userMaxHp, user: newUser, userHpRecoveryTime, currentBoss, userWeapon, isBossDead } = response.data;
+        const { bossAttack, userDamage, userDefense, isLastAttack, userMaxHp, user: newUser, userHpRecoveryTime, currentBoss, userWeapon, isBossDead, newBoss, isAttackPotionActive, isDefensePotionActive } = response.data;
 
         // 世界首領血量
-        const bossHpUI = hpUI(currentBoss.remainingHp, currentBoss.hp);
+        const bossHpUI = newBoss ? hpUI(newBoss.remainingHp, newBoss.hp) : hpUI(currentBoss.remainingHp, currentBoss.hp);
+
+        // 玩家藥水狀態
+        const { potionInfo, timeMap } = await axios.get(`${process.env.API_URL}/game/potions`).then(res => res.data).catch(() => []);
+        const userPotionStatus = []
+        if (isAttackPotionActive) {
+          userPotionStatus.push(`<:${potionInfo[4].emojiName}:${potionInfo[4].emojiId}> ${potionInfo[4].name}`)
+        }
+        if (isDefensePotionActive) {
+          userPotionStatus.push(`<:${potionInfo[5].emojiName}:${potionInfo[5].emojiId}> ${potionInfo[5].name}`)
+        }
+        const potionStatus = userPotionStatus.length > 0 ? `\n\n**藥水狀態**:\n${userPotionStatus.join('\n')}` : '';
 
         // 玩家血量
         const userHpUI = hpUI(parseInt(newUser.hp), userMaxHp);
 
         // 玩家是否死亡
-        const userDeadMsg = newUser.hp <= 0 ? `你已經死亡，請等待 ${userHpRecoveryTime} 秒後重生` : '';
+        const userDeadMsg = newUser.hp <= 0 ? `\n\n你已經死亡，請等待 ${userHpRecoveryTime} 秒後重生` : '';
 
         // 玩家是否為最後一次攻擊
-        const isLastAttackMsg = isLastAttack ? '**你是最後一次攻擊！將獲得額外一個隨機獎勵！**' : '';
+        const isLastAttackMsg = isLastAttack ? '\n\n**你是最後一次攻擊！將獲得額外一個隨機獎勵！**' : '';
 
         // 世界首領是否死亡
-        const isBossDeadMsg = isBossDead ? '**世界首領已經死亡！\n**請到 個人資料 -> 領取世界首領獎勵 領取獎勵**\n\n' : '';
+        const isBossDeadMsg = isBossDead ? '\n\n**世界首領已經死亡！\n請到 個人資料 -> 領取世界首領獎勵 領取獎勵**' : '';
+
+        // 新世界首領資料
+        const hasNewBoss = newBoss ? `\n\n**新的世界首領 [${newBoss.qualityName}] ${newBoss.worldBoss.name} LV.${newBoss.worldBoss.difficulty} 出現！**` : '';
 
         const embed = new EmbedBuilder()
           .setTitle(`${user.data.name} 攻擊 [${currentBoss.qualityName}] ${currentBoss.worldBoss.name} LV.${currentBoss.worldBoss.difficulty}`)
-          .setDescription(`你的武器 - ** [${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level} ** \n\n 造成的傷害: **${userDamage}**\n防禦的傷害: **${userDefense}**\n\n世界首領對你造成的傷害: **${bossAttack}**\n\n ${isLastAttackMsg} \n ${isBossDeadMsg} 你的血量 \n${userHpUI} \n${userDeadMsg} \n\n世界首領血量 \n${bossHpUI}`)
+          .setDescription(`你的武器 - ** [${userWeapon.qualityName}] ${userWeapon.weapon.name} +${userWeapon.level} ${potionStatus} ** \n\n造成的傷害: **${userDamage}**\n防禦的傷害: **${userDefense}**\n\n世界首領對你造成的傷害: **${bossAttack}** ${isLastAttackMsg} ${isBossDeadMsg} \n\n你的血量 \n${userHpUI} ${userDeadMsg} ${hasNewBoss} \n\n世界首領血量 \n${bossHpUI}`)
           .setColor(user.data.color || 0x000000)
           .setTimestamp();
 

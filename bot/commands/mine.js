@@ -58,7 +58,6 @@ module.exports = {
 
     // 自動挖礦結果
     if (autoMineResult.totalValue > 0) {
-      console.log('autoMineResult', autoMineResult);
       msg += `自動開採藥劑挖到了 \n\n${autoMineResult.minerals.map(m => `<:${m.emojiName}:${m.emojiId}>  ${m.name} x ** ${m.num}**`).join('\n')}\n\n`;
       totalValue += autoMineResult.totalValue;
       totalExp += autoMineResult.totalExp;

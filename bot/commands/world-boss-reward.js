@@ -52,12 +52,13 @@ module.exports = {
           .setStyle('Primary');
         actionsRow.addComponents(returnButton);
 
+        await interaction.deleteReply();
         const embed = new EmbedBuilder()
           .setTitle(`${user.data.name} 領取世界首領獎勵`)
           .setDescription(`獲得 ${pearl} 顆<:pearl:1325305628096462950>珠寶\n獲得 ${qualityUpgradeSet} 個<:quality_set:1325383804113649734>品質升級套組\n\n獲得以下道具:\n\n ${itemMsg}`)
           .setColor(user.data.color || 0x000000)
           .setTimestamp();
-        return interaction.editReply({ embeds: [embed], components: [actionsRow], ephemeral: true });
+        return interaction.followUp({ embeds: [embed], components: [actionsRow], ephemeral: true });
       }
     } catch (error) {
       console.error(error);

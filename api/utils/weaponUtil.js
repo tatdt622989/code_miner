@@ -6,13 +6,13 @@ const getStrengthenData = (level) => {
   if (level < 11) {
     return { pearl: 1, probability: 0.5, increase: 1.1 };
   } else if (level < 21) {
-    return { pearl: 2, probability: 0.25, increase: 1.2 };
+    return { pearl: 2, probability: 0.20, increase: 1.2 };
   } else if (level < 31) {
-    return { pearl: 3, probability: 0.1, increase: 1.3 };
+    return { pearl: 3, probability: 0.1, increase: 1.23 };
   } else if (level < 41) {
-    return { pearl: 4, probability: 0.04, increase: 1.4 };
+    return { pearl: 4, probability: 0.04, increase: 1.25 };
   } else if (level < 51) {
-    return { pearl: 5, probability: 0.005, increase: 1.5 };
+    return { pearl: 5, probability: 0.005, increase: 1.3 };
   } else {
     return null;
   }
@@ -21,16 +21,18 @@ const getStrengthenData = (level) => {
 // 取得提升品質消耗道具、機率、提升倍率
 const getQualityData = (quality) => {
   switch (quality) {
+    case 1:
+      return { qualityUpgradeSet: 0, probability: 0, increase: 1 };
     case 2:
       return { qualityUpgradeSet: 1, probability: 0.5, increase: 2 };
     case 3:
-      return { qualityUpgradeSet: 2, probability: 0.2, increase: 4 };
+      return { qualityUpgradeSet: 3, probability: 0.2, increase: 4 };
     case 4:
-      return { qualityUpgradeSet: 4, probability: 0.08, increase: 6 };
+      return { qualityUpgradeSet: 6, probability: 0.08, increase: 6 };
     case 5:
-      return { qualityUpgradeSet: 6, probability: 0.04, increase: 12 };
+      return { qualityUpgradeSet: 12, probability: 0.03, increase: 12 };
     case 6:
-      return { qualityUpgradeSet: 10, probability: 0.005, increase: 24 };
+      return { qualityUpgradeSet: 30, probability: 0.005, increase: 24 };
     default:
       return null;
   }
@@ -70,7 +72,12 @@ const getWeaponData = async(weaponId, quality, level) => {
   }
 
   try {
-    const weapon = await Weapon.findById(weaponId);
+    const weapons = await Weapon.find().sort({ price: 1 });
+    const weaponIndex = weapons.findIndex(w => w._id.toString() === weaponId);
+    if (weaponIndex === -1) {
+      return null;
+    }
+    const weapon = weapons[weaponIndex];
     const qualityData = getQualityData(quality);
     if (!qualityData) {
       return null;
@@ -93,11 +100,23 @@ const getWeaponData = async(weaponId, quality, level) => {
       qualityWeaponBasicDefense.min = (qualityWeaponBasicDefense.min * strengthenData.increase).toFixed(2);
       qualityWeaponBasicDefense.max = (qualityWeaponBasicDefense.max * strengthenData.increase).toFixed(2);
     }
-    return { attack: qualityWeaponBasicAttack, defense: qualityWeaponBasicDefense };
+    return { attack: qualityWeaponBasicAttack, defense: qualityWeaponBasicDefense, weaponRanking: weaponIndex + 1 };
   } catch (err) {
     console.log(err);
     return null;
   }
 }
 
-module.exports = { getStrengthenData, getQualityData, getWeaponData, getQualityName };
+const getWeaponRequirements = (priceIndex) => {
+  const requirements = [
+    { strengthen: 0, quality: 0 },
+    { strengthen: 15, quality: 1 },
+    { strengthen: 25, quality: 2 },
+    { strengthen: 35, quality: 3 },
+    { strengthen: 45, quality: 4 },
+    { strengthen: 50, quality: 5 },
+  ]
+  return requirements[priceIndex] || null;
+}
+
+module.exports = { getStrengthenData, getQualityData, getWeaponData, getQualityName, getWeaponRequirements };

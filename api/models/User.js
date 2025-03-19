@@ -86,6 +86,7 @@ const potionEffectSchema = new mongoose.Schema({
   miningRewardDouble: potionEffectDetailsSchema,
   autoMine: autoMineSchema,
   worldBossAttackDouble: potionEffectDetailsSchema,
+  defenseDouble: potionEffectDetailsSchema
 });
 
 // 玩家
@@ -159,6 +160,10 @@ const userSchema = new mongoose.Schema({
   lastAttackWorldBoss: {
     type: Date,
     default: new Date(0),
+  },
+  infoPictureHash: {
+    type: String,
+    default: '',
   }
 }, { timestamps: true });
 

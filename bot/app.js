@@ -95,9 +95,8 @@ client.on('interactionCreate', async interaction => {
   } else if(interaction.isStringSelectMenu()) {
      // 處理選擇菜單
      const selectedOption = interaction.values[0]; // 取得選擇的值
-     console.log(selectedOption.split('_'));
-     const [command, ...optionValue] = selectedOption.split('_');
-     await handleCommand(interaction, command, optionValue);
+      const [command, ...optionValue] = selectedOption.split('_');
+      await handleCommand(interaction, command, optionValue);
   }
 });
 

@@ -112,22 +112,25 @@ module.exports = {
           `寵物會在你挖礦的時候有機率把道具帶回來\n越高階的寵物，拾獲越好道具的可能性越高\n\n` +
           `${pets.data.map(pet => `<:${pet.emojiName}:${pet.emojiId}> ${pet.name} - **${pet.owned ? '已擁有' : formatWithThousandSeparators(pet.price) + ' <:coin:1271510831359852709>'}** \n \`拾獲道具機率: ${(pet.triggerProbability).toFixed(2)}% \``).join('\n')}`;
       } else if (item === 'potion') {
-        perRow = 3; // 每一行最多3個按鈕
+        perRow = 5; // 每一行最多3個按鈕
         const { potionInfo, timeMap } = await axios.get(`${process.env.API_URL}/game/potions`).then(res => res.data).catch(() => []);
         // 取得藥水效果
         const {
           petTriggerProbabilityDouble = {},
           miningRewardDouble = {},
           autoMine = {},
-          worldBossAttackDouble = {}
+          worldBossAttackDouble = {},
+          defenseDouble = {}
         } = user.data.potionEffect || {};
         petTriggerProbabilityDouble.active = new Date(petTriggerProbabilityDouble.end) > new Date();
         miningRewardDouble.active = new Date(miningRewardDouble.end) > new Date();
         worldBossAttackDouble.active = new Date(worldBossAttackDouble.end) > new Date();
+        defenseDouble.active = new Date(defenseDouble.end) > new Date();
         potionInfo[1].active = petTriggerProbabilityDouble.active;
         potionInfo[2].active = miningRewardDouble.active;
         potionInfo[3].active = autoMine.active;
         potionInfo[4].active = worldBossAttackDouble.active;
+        potionInfo[5].active = defenseDouble.active;
         Object.keys(potionInfo).forEach(key => {
           Object.keys(timeMap).forEach(timeKey => {
             const disabled = potionInfo[key].active || potionInfo[key].price * timeKey > user.data.magicalHerb;
@@ -169,8 +172,8 @@ module.exports = {
             .setStyle('Primary');
           buttonList.push(button);
         });
-        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n 武器可以用來攻擊世界首領 \n 強化、提升品質都可以讓武器更強 \n\n **武器化到+15以上，才能購買下一階武器** \n\n` +
-        `${weapons.data.map(weapon => `<:${weapon.emojiName}:${weapon.emojiId}> ${weapon.name} - **${weapon.owned ? '已擁有' : formatWithThousandSeparators(weapon.price) + ' <:coin:1271510831359852709>'}**`).join('\n')}` +
+        msg = `擁有金幣: **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n 武器可以用來攻擊世界首領 \n 強化、提升品質都可以讓武器更強 \n\n` +
+        `${weapons.data.map(weapon => `<:${weapon.emojiName}:${weapon.emojiId}> ${weapon.name} - **${weapon.owned ? '已擁有' : formatWithThousandSeparators(weapon.price) + ' <:coin:1271510831359852709>'}** ${weapon.buyNextWeaponRequirement ? `\n\`(達到 +${weapon.buyNextWeaponRequirement.strengthen}、${weapon.buyNextWeaponRequirement.quality}品質，才能買下階武器)\`` : ''}`).join('\n\n')}` +
         ` \n\n ⚠️ **購買武器後，需到 [個人資料 -> 更換武器] 裝備**`;
       }
       // 每一行按鈕數量

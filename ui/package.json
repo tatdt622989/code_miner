@@ -1,0 +1,16 @@
+{
+  "name": "web-screenshot",
+  "version": "1.0.0",
+  "description": "網頁截圖應用程式",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "puppeteer": "^21.11.0"
+  }
+}

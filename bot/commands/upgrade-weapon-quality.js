@@ -12,32 +12,32 @@ module.exports = {
     const discordId = interaction.user.id;
     const userId = optionValue && optionValue[0] || interaction.options?.getString('item_id');
 
-    // 判斷是按鈕互動還是指令互動，先回應延遲
-    if (userId) {
-      await interaction.deferReply();
-    } else {
-      await interaction.deferUpdate();
-    }
-
-    // 獲取用戶資料
-    const user = await axios.get(`${process.env.API_URL}/users/${discordId}`);
-    if (!user.data) {
-      return interaction.editReply({ content: '用戶不存在，請先使用 `/mine` 創建角色', ephemeral: true });
-    }
-
-    // 判斷是否是正確的用戶
-    if (user.data.discordId !== discordId) {
-      return interaction.editReply({ content: '你不是這個用戶!請到個人資料 -> 武器頁面使用', ephemeral: true });
-    }
-
-    // 獲取用戶的武器列表
-    const weapons = user.data.weapons || [];
-    if (weapons.length === 0) {
-      return interaction.editReply({ content: '你還沒有任何武器！', ephemeral: true });
-    }
-    const weapon = weapons.find(w => w.weapon._id === user.data.equipped.weapon);
-
     try {
+      // 判斷是按鈕互動還是指令互動，先回應延遲
+      if (userId) {
+        await interaction.deferReply();
+      } else {
+        await interaction.deferUpdate();
+      }
+
+      // 獲取用戶資料
+      const user = await axios.get(`${process.env.API_URL}/users/${discordId}`);
+      if (!user.data) {
+        throw new Error('用戶不存在，請先使用 `/mine` 創建角色');
+      }
+
+      // 判斷是否是正確的用戶
+      if (user.data.discordId !== discordId) {
+        throw new Error('你不是這個用戶!請到個人資料 -> 武器頁面使用');
+      }
+
+      // 獲取用戶的武器列表
+      const weapons = user.data.weapons || [];
+      if (weapons.length === 0) {
+        throw new Error('你還沒有任何武器！\n請先到商店購買武器');
+      }
+      const weapon = weapons.find(w => w.weapon._id === user.data.equipped.weapon);
+
       if (userId) { // 強化
         const response = await axios.post(`${process.env.API_URL}/game/upgradeWeaponQuality`, {
           discordId,
@@ -130,17 +130,16 @@ module.exports = {
         });
       }
     } catch (error) {
-      console.error('Error:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.error || '無法獲取武器資訊或武器升級錯誤';
+      const errorMessage = error.response?.data?.error || error.message || '無法獲取武器資訊或武器升級錯誤';
 
       const embed = new EmbedBuilder()
         .setColor('#ff0000')
-        .setTitle('錯誤')
+        .setTitle('無法使用武器品質升級')
         .setDescription(errorMessage)
         .setTimestamp()
 
       const returnButton = new ButtonBuilder()
-        .setCustomId('upgrade-weapon-quality')
+        .setCustomId('weapon')
         .setLabel('返回')
         .setStyle('Secondary');
       const actionRow = new ActionRowBuilder().addComponents(returnButton);

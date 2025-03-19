@@ -33,11 +33,15 @@ module.exports = {
     const msg = `等級: **${level}**\n${expBar}\n\n` +
       `金幣 : **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
       `鑰匙 : **${user.data.raffleTicket}** <:key:1274402290006233088>\n` +
-      `魔法藥草 : **${user.data.magicalHerb}** <:magic_herb:1302301265950277673>\n` +
-      `裝備工具 : <:${user.data.equipped.tool.emojiName}:${user.data.equipped.tool.emojiId}> **${user.data.equipped.tool.name}** \n` +
-      `裝備武器 : ${userWeapon ? `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> **[${userWeapon.qualityName}] ${userWeapon.weapon.name}** +${userWeapon.level}` : '無'}\n` +
-      `裝備礦場 : <:${user.data.equipped.mine.emojiName}:${user.data.equipped.mine.emojiId}> **${user.data.equipped.mine.name}** \n` +
-      `裝備寵物 : ${user.data.equipped.pet ? `<:${user.data.equipped.pet.emojiName}:${user.data.equipped.pet.emojiId}> **${user.data.equipped.pet.name}**` : '無'}`;
+      `魔法藥草 : **${user.data.magicalHerb}** <:magic_herb:1302301265950277673>\n`;
+    // const msg = `等級: **${level}**\n${expBar}\n\n` +
+    //   `金幣 : **${formatWithThousandSeparators(user.data.currency)}** <:coin:1271510831359852709>\n` +
+    //   `鑰匙 : **${user.data.raffleTicket}** <:key:1274402290006233088>\n` +
+    //   `魔法藥草 : **${user.data.magicalHerb}** <:magic_herb:1302301265950277673>\n` +
+    //   `裝備工具 : <:${user.data.equipped.tool.emojiName}:${user.data.equipped.tool.emojiId}> **${user.data.equipped.tool.name}** \n` +
+    //   `裝備武器 : ${userWeapon ? `<:${userWeapon.weapon.emojiName}:${userWeapon.weapon.emojiId}> **[${userWeapon.qualityName}] ${userWeapon.weapon.name}** +${userWeapon.level}` : '無'}\n` +
+    //   `裝備礦場 : <:${user.data.equipped.mine.emojiName}:${user.data.equipped.mine.emojiId}> **${user.data.equipped.mine.name}** \n` +
+    //   `裝備寵物 : ${user.data.equipped.pet ? `<:${user.data.equipped.pet.emojiName}:${user.data.equipped.pet.emojiId}> **${user.data.equipped.pet.name}**` : '無'}`;
 
     // 挖礦按鈕
     const button = new ButtonBuilder()
@@ -112,11 +116,24 @@ module.exports = {
       new ActionRowBuilder().addComponents( weaponButton, bossButton, rewardButton),
     ];
 
+    // 檢查圖片是否需要更新
+    let hash = '';
+    try {
+      const checkPicture = await axios.get(`${process.env.API_URL}/users/checkImageUpdate/${discordId}`);
+      console.log(checkPicture.data);
+      if (checkPicture.data) {
+        hash = checkPicture.data.hash;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
     // 訊息輸出
     const embed = new EmbedBuilder()
       .setTitle(`${interaction.user.globalName} 的個人資料`)
       .setDescription(msg)
       .setColor(user.data.color || 0x000000)
+      .setImage(`https://ui.reisui.fun/screenshot/${discordId}?hash=${hash}&v=25`)
       .setTimestamp();
 
     await interaction.editReply({

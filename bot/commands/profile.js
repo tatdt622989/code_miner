@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, AttachmentBuilder } = require('discord.js');
 const axios = require('axios');
 const formatWithThousandSeparators = require('../utils/formatWithThousandSeparators');
 
@@ -128,17 +128,43 @@ module.exports = {
       console.error(error);
     }
 
+    // 透過內網讀取圖片並轉為附件
+    let attachment;
+    const timestamp = Date.now();
+    const fileName = `profile_${timestamp}.png`;
+    
+    try {
+      const uiUrl = process.env.UI_URL || 'http://localhost:3001';
+      // 將版本號改成隨機時間戳，避免 axios 或內網快取
+      const imageResponse = await axios.get(`${uiUrl}/screenshot/${discordId}?hash=${hash}&v=${timestamp}`, {
+        responseType: 'arraybuffer'
+      });
+      // 檔名也加上時間戳，避免 Discord 客戶端快取相同的檔名
+      attachment = new AttachmentBuilder(imageResponse.data, { name: fileName });
+    } catch (error) {
+      console.error('讀取 UI 截圖失敗:', error);
+    }
+
     // 訊息輸出
     const embed = new EmbedBuilder()
       .setTitle(`${interaction.user.globalName} 的個人資料`)
       .setDescription(msg)
       .setColor(user.data.color || 0x000000)
-      .setImage(`https://ui.reisui.fun/screenshot/${discordId}?hash=${hash}&v=25`)
       .setTimestamp();
 
-    await interaction.editReply({
+    if (attachment) {
+      embed.setImage(`attachment://${fileName}`);
+    }
+
+    const replyOptions = {
       embeds: [embed],
       components: [...actionRow],
-    });
+    };
+
+    if (attachment) {
+      replyOptions.files = [attachment];
+    }
+
+    await interaction.editReply(replyOptions);
   }
 }

@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    # 不綁定本機 port，由 Coolify 透過內部網路和 Traefik 反向代理處理
+    environment:
+      - PORT=3000
+      - MONGODB_HOST=${MONGODB_HOST}
+      - MONGODB_PORT=${MONGODB_PORT}
+      - MONGODB_USER=${MONGODB_USER}
+      - MONGODB_PASS=${MONGODB_PASS}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME}
+      - MONGODB_DB_NAME2=${MONGODB_DB_NAME2}
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      # 內部網路可直接透過 service name 解析
+      - API_URL=http://api:3000/api
+      - UI_URL=http://ui:3000
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    # 不綁定本機 port，由 Coolify 透過內部網路和 Traefik 反向代理處理
+    environment:
+      - PORT=3000
+      # 內部網路直接存取 api
+      - API_URL=http://api:3000
+    restart: unless-stopped
+    depends_on:
+      - api

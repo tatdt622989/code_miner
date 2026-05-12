@@ -1,7 +1,7 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
 const path = require('path');
 const cors = require('cors');
+const GameUiRenderer = require('./gameUiRenderer');
 
 require('dotenv').config();
 
@@ -17,7 +17,8 @@ app.use(express.static(path.join(__dirname, 'game-ui/dist')));
 app.get('/api/users/:discordId', async (req, res) => {
   try {
     const { discordId } = req.params;
-    const response = await fetch(`http://localhost:${process.env.API_PORT}/api/users/${discordId}`);
+    const apiUrl = process.env.API_URL || `http://localhost:${process.env.API_PORT}`;
+    const response = await fetch(`${apiUrl}/api/users/${discordId}`);
     const data = await response.json();
     res.json(data);
   } catch (error) {
@@ -31,42 +32,21 @@ app.get('/screenshot/:discordId', async (req, res) => {
   try {
     const { discordId } = req.params;
 
-    // 啟動瀏覽器
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    // 1. 直接取得玩家資料
+    // 註：如果你整合進 Discord Bot 的 controller，這裡甚至可以直接從資料庫 query，不需要透過 HTTP fetch
+    const apiUrl = process.env.API_URL || `http://localhost:${process.env.API_PORT}`;
+    const response = await fetch(`${apiUrl}/api/users/${discordId}`);
+    const userData = response.ok ? await response.json() : { level: 1, gold: 0 }; // 預設值備備案
 
-    const page = await browser.newPage();
-
-    // 設置視窗大小
-    await page.setViewport({
-      width: 456,
-      height: 226
-    });
-
-    // 訪問遊戲UI頁面
-    await page.goto(`https://app.6yuwei.com/code_miner_ui/?discordId=${discordId}&v=${Date.now()}`, {
-      waitUntil: 'domcontentloaded'
-    });
-
-    // 等待截圖
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // 截圖
-    const screenshot = await page.screenshot({
-      type: 'png',
-      fullPage: true
-    });
-
-    await browser.close();
+    // 2. 呼叫封裝好的 Canvas 畫圖物件
+    const buffer = await GameUiRenderer.generatePlayerProfile(discordId, userData);
 
     // 設置響應頭
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `inline; filename="game-${discordId}.png"`);
 
     // 發送截圖
-    res.send(screenshot);
+    res.send(buffer);
 
   } catch (error) {
     console.error('截圖錯誤:', error);
